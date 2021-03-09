@@ -46,7 +46,7 @@ int open_netlink()
 /* Helper structure for ip address data and attributes */
 typedef struct {
     char family;
-    char bitlen;
+    unsigned char bitlen;
     unsigned char data[sizeof(struct in6_addr)];
 } _inet_addr;
 
@@ -68,10 +68,12 @@ int rtattr_add(struct nlmsghdr *n, int maxlen, int type, const void *data, int a
     rta = NLMSG_TAIL(n);
     rta->rta_type = type;
     rta->rta_len = len; 
-
+    printf("#1: %d\n", alen);
     if (alen) {
         memcpy(RTA_DATA(rta), data, alen);
     }
+
+    printf("#2\n");
 
     n->nlmsg_len = NLMSG_ALIGN(n->nlmsg_len) + RTA_ALIGN(len);
 
@@ -108,22 +110,25 @@ int do_route(int sock, int cmd, int flags, _inet_addr *dst, _inet_addr *gw, int 
     } else {
         nl_request.r.rtm_scope = RT_SCOPE_LINK;
     }
-
+    printf("Set gw\n");
     /* Set gateway */
     if (gw->bitlen != 0) {
         rtattr_add(&nl_request.n, sizeof(nl_request), RTA_GATEWAY, &gw->data, gw->bitlen / 8);
         nl_request.r.rtm_scope = 0;
         nl_request.r.rtm_family = gw->family;
     }
-
+    printf("Set addr\n");
     /* Don't set destination and interface in case of default gateways */
     if (!def_gw) {
         /* Set destination network */
+        printf("1, %d\n", dst->bitlen);
         rtattr_add(&nl_request.n, sizeof(nl_request), /*RTA_NEWDST*/ RTA_DST, &dst->data, dst->bitlen / 8);
-
+        printf("2\n");
         /* Set interface */
         rtattr_add(&nl_request.n, sizeof(nl_request), RTA_OIF, &if_idx, sizeof(int));
     }
+
+    printf("Send message\n");
 
     /* Send message to the netlink */
     return send(sock, &nl_request, sizeof(nl_request), 0);
