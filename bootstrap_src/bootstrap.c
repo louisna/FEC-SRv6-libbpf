@@ -149,6 +149,12 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+	int fd = bpf_program__nth_fd(skel->progs.handle_exec, 0);
+    printf("Value of the file descriptor of the program: %d\n", fd);
+
+	fd = bpf_program__nth_fd(skel->progs.handle_exit, 0);
+    printf("Value of the file descriptor of the program: %d\n", fd);
+
 	/* Attach tracepoints */
 	err = bootstrap_bpf__attach(skel);
 	if (err) {

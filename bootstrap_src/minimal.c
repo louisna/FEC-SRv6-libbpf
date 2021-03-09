@@ -52,6 +52,9 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+	int fd = bpf_program__nth_fd(skel->progs.handle_tp, 0);
+    printf("Value of the file descriptor of the program: %d\n", fd);
+
 	/* Attach tracepoint handler */
 	err = minimal_bpf__attach(skel);
 	if (err) {
