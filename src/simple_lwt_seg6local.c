@@ -7,6 +7,7 @@
 #include <sys/resource.h>
 #include <bpf/libbpf.h>
 #include "simple_lwt_seg6local.skel.h"
+#include <bpf/bpf.h>
 
 /* Used to detect the end of the program */
 static volatile bool exiting = 0;
@@ -52,6 +53,8 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    
+
     /* Load and verify BPF program */
     err = simple_lwt_seg6local_bpf__load(skel);
     if (err) {
@@ -63,29 +66,34 @@ int main(int argc, char **argv) {
     /*err = simple_lwt_seg6local_bpf__attach(skel);
     if (err) {
         fprintf(stderr, "Failed to attach BPF skeleton :(\n");
-        goto cleanup;
+        goto cleanup; 
     }*/
-
-    char cmd[150];
-    strcat(cmd, "python3 attach_bpf.py add ");
 
     int fd = bpf_program__nth_fd(skel->progs.notify_ok, 0);
     printf("Value of the file descriptor of the program: %d\n", fd);
     printf("Name is: %s\n", bpf_program__name(skel->progs.notify_ok));
 
-    char buffer[3];
-    sprintf(buffer, "%d", fd);
-    strcat(cmd, buffer);
-    printf("Successfully started the BPF program\n");
-    printf("Command to be executed: %s\n", cmd);
-    int out = system(cmd);
-    printf("Output of the system call: %d\n", out);
+
+    bpf_object__pin(skel->obj, "/sys/fs/bpf/simple_me");
+
+    char *cmd = "sudo ip -6 route add fc00::a encap seg6local action End.BPF endpoint fd /sys/fs/bpf/simple_me/lwt_seg6local section notify_ok dev enp0s3";
+    printf("Command is %sn", cmd);
+    //system(cmd);
+
+    struct bpf_map *my_map = skel->maps.my_map;
+    int map_fd = bpf_map__fd(my_map);
 
     while (!exiting) {
+        const int k = 0;
+        int val = -1;
+        bpf_map_lookup_elem(map_fd, &k, &val);
+        printf("Value de val:%d\n", val);
         sleep(1);
     }
-
-cleanup:
+    bpf_object__unpin_programs(skel->obj, "/sys/fs/bpf/simple_me");
+    bpf_map__unpin(my_map, "/sys/fs/bpf/simple_me/my_map");
     simple_lwt_seg6local_bpf__destroy(skel);
+cleanup:
+    bpf_object__unpin_programs(skel->obj, "/sys/fs/bpf/simple_me");
     return 0;
 }

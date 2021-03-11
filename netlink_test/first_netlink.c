@@ -14,17 +14,9 @@
 #include <net/if.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <linux/seg6_local.h>
 #include <linux/rtnetlink.h>
-
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <net/if.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <linux/rtnetlink.h>
+#include <linux/lwtunnel.h>
 
 /* Open netlink socket */
 int open_netlink()
@@ -80,6 +72,92 @@ int rtattr_add(struct nlmsghdr *n, int maxlen, int type, const void *data, int a
     return 0;
 }
 
+int rta_addattr32(struct rtattr *rta, int maxlen, int type, __u32 data)
+{
+	int len = RTA_LENGTH(4);
+	struct rtattr *subrta;
+
+	if (RTA_ALIGN(rta->rta_len) + len > maxlen) {
+		fprintf(stderr,
+			"rta_addattr32: Error! max allowed bound %d exceeded\n",
+			maxlen);
+		return -1;
+	}
+	subrta = (struct rtattr *)(((char *)rta) + RTA_ALIGN(rta->rta_len));
+	subrta->rta_type = type;
+	subrta->rta_len = len;
+	memcpy(RTA_DATA(subrta), &data, 4);
+	rta->rta_len = NLMSG_ALIGN(rta->rta_len) + len;
+	return 0;
+}
+
+int rta_addattr_l(struct rtattr *rta, int maxlen, int type,
+		  const void *data, int alen)
+{
+	struct rtattr *subrta;
+	int len = RTA_LENGTH(alen);
+
+	if (RTA_ALIGN(rta->rta_len) + RTA_ALIGN(len) > maxlen) {
+		fprintf(stderr,
+			"rta_addattr_l: Error! max allowed bound %d exceeded\n",
+			maxlen);
+		return -1;
+	}
+	subrta = (struct rtattr *)(((char *)rta) + RTA_ALIGN(rta->rta_len));
+	subrta->rta_type = type;
+	subrta->rta_len = len;
+	if (alen)
+		memcpy(RTA_DATA(subrta), data, alen);
+	rta->rta_len = NLMSG_ALIGN(rta->rta_len) + RTA_ALIGN(len);
+	return 0;
+}
+
+int rtattr_add_encap(struct nlmsghdr *n, int maxlen, int fd) {
+    int ret;
+
+    // Create sub RTA with values
+    struct rtattr *rta;
+    uint32_t action = 15; // 15 = BPF
+    ret = rta_addattr32(rta, maxlen, SEG6_LOCAL_ACTION, action);
+
+    // BPF encap
+    struct rtattr *nest;
+	int err;
+
+	nest = rta_nest(rta, len, attr);
+
+    // Do add BPF encap
+    //..
+    char annotation[256];
+    char *base_name = "simple_lwt_seg6local"
+    char *section = "notify_ok";
+    snprintf(annotation, sizeof(annotation), "%s:[%s]", base_name, section);
+    rta_addattr32(rta, maxlen, LWT_BPF_PROG_FD, fd);
+	rta_addattr_l(rta, maxlen, LWT_BPF_PROG_NAME, annotation, strlen(annotation) + 1);
+
+    rta_nest_end(rta, nest);
+
+    if (NLMSG_ALIGN(n->nlmsg_len) + RTA_ALIGN(len) > maxlen) {
+        fprintf(stderr, "rtattr_add error: message exceeded bound of %d\n", maxlen);
+        return -1;
+    }
+
+    rta = NLMSG_TAIL(n);
+    rta->rta_type = type;
+    rta->rta_len = len; 
+    printf("#1: %d\n", alen);
+    if (alen) {
+        // memcpy rta
+    }
+
+    printf("#2\n");
+
+    n->nlmsg_len = NLMSG_ALIGN(n->nlmsg_len) + RTA_ALIGN(len);
+
+
+    return 0;
+}
+
 int do_route(int sock, int cmd, int flags, _inet_addr *dst, _inet_addr *gw, int def_gw, int if_idx) {
     struct {
         struct nlmsghdr n;
@@ -126,6 +204,13 @@ int do_route(int sock, int cmd, int flags, _inet_addr *dst, _inet_addr *gw, int 
         printf("2\n");
         /* Set interface */
         rtattr_add(&nl_request.n, sizeof(nl_request), RTA_OIF, &if_idx, sizeof(int));
+
+        printf("Try to add encapsulation type...\n");
+        short encap_type = 7;
+        rtattr_add(&nl_request.n, sizeof(nl_request), RTA_ENCAP_TYPE, &encap_type, sizeof(short));
+        /* look at iproute2-seg6-bpf/ip/iproute_lwtunnel.c line 566 */
+        // rta_addattr32(NULL, 3, "SEG6_LOCAL_ACTION", "End.BPF");
+        rtattr_add_encap(&nl_request.n, sizeof(nl_request), RTA_ENCAP, "SEG6_LOCAL_ACTION", sizeof(char));
     }
 
     printf("Send message\n");
