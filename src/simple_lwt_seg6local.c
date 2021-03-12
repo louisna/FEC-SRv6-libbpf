@@ -82,6 +82,9 @@ int main(int argc, char **argv) {
         printf("Value de val:%d\n", val);
         sleep(1);
     }
+
+    // We reach this point when we Ctrl+C with signal handling
+    /* Unpin the program and the maps to clean at exit */
     bpf_object__unpin_programs(skel->obj, "/sys/fs/bpf/simple_me");
     bpf_map__unpin(map_indexTable, "/sys/fs/bpf/simple_me/indexTable");
     bpf_map__unpin(map_sourceSymbolBuffer, "/sys/fs/bpf/simple_me/sourceSymbolBuffer");

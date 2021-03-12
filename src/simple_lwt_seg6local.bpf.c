@@ -3,8 +3,10 @@
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
 #include "fec_srv6.h"
+#include "libseg6.c"
 
 #define DEBUG 1
+#define BPF_ERROR BPF_DROP  // Choose action when an error occurs in the process
 
 /* Structures */
 struct sourceSymbol_t {
@@ -40,21 +42,21 @@ struct {
     __type(value, struct repairSymbol_t);
 } repairSymbolBuffer SEC(".maps");
 
+// TODO: perf output map
+
 SEC("lwt_seg6local")
 int notify_ok(struct __sk_buff *skb) {
     bpf_printk("BPF triggered from packet with SRv6 !\n");
-    __u32 k = 0;
-    __u16 *val = bpf_map_lookup_elem(&indexTable, &k);
-    bpf_printk("J'ai recup la valeur...\n");
-    __u16 vval;
-    if (!val) {
-        vval = 0;
-    } else {
-        vval = *val;
+
+    int err;
+    int k = 0;  // Key for hashmap
+
+    /* Get Segment Routing Header */
+    struct ip6_srh_t *srh = seg6_get_srh(skb);
+    if (!srh) {
+        if (DEBUG) bpf_printk("Sender: impossible to get the SRH\n");
+        return BPF_ERROR;
     }
-    bpf_printk("Value is: %d\n", vval);
-    vval++;
-    bpf_map_update_elem(&indexTable, &k, &vval, BPF_ANY);
 
     return BPF_OK;
 }
