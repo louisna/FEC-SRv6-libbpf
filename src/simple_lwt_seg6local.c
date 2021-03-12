@@ -53,8 +53,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    
-
     /* Load and verify BPF program */
     err = simple_lwt_seg6local_bpf__load(skel);
     if (err) {
@@ -62,38 +60,33 @@ int main(int argc, char **argv) {
         goto cleanup;
     }
 
-    /* Attach tracepoint handler */
-    /*err = simple_lwt_seg6local_bpf__attach(skel);
-    if (err) {
-        fprintf(stderr, "Failed to attach BPF skeleton :(\n");
-        goto cleanup; 
-    }*/
-
-    int fd = bpf_program__nth_fd(skel->progs.notify_ok, 0);
-    printf("Value of the file descriptor of the program: %d\n", fd);
-    printf("Name is: %s\n", bpf_program__name(skel->progs.notify_ok));
-
-
     bpf_object__pin(skel->obj, "/sys/fs/bpf/simple_me");
 
     char *cmd = "sudo ip -6 route add fc00::a encap seg6local action End.BPF endpoint fd /sys/fs/bpf/simple_me/lwt_seg6local section notify_ok dev enp0s3";
     printf("Command is %sn", cmd);
     //system(cmd);
 
-    struct bpf_map *my_map = skel->maps.my_map;
-    int map_fd = bpf_map__fd(my_map);
+    struct bpf_map *map_indexTable = skel->maps.indexTable;
+    int map_fd_indexTable = bpf_map__fd(map_indexTable);
+
+    struct bpf_map *map_sourceSymbolBuffer = skel->maps.sourceSymbolBuffer;
+    int map_fd_sourceSymbolBuffer = bpf_map__fd(map_sourceSymbolBuffer);
+
+    struct bpf_map *map_repairSymbolBuffer = skel->maps.repairSymbolBuffer;
+    int map_fd_repairSymbolBuffer = bpf_map__fd(map_repairSymbolBuffer);
 
     while (!exiting) {
         const int k = 0;
-        int val = -1;
-        bpf_map_lookup_elem(map_fd, &k, &val);
+        uint16_t val = -1;
+        bpf_map_lookup_elem(map_fd_indexTable, &k, &val);
         printf("Value de val:%d\n", val);
         sleep(1);
     }
     bpf_object__unpin_programs(skel->obj, "/sys/fs/bpf/simple_me");
-    bpf_map__unpin(my_map, "/sys/fs/bpf/simple_me/my_map");
+    bpf_map__unpin(map_indexTable, "/sys/fs/bpf/simple_me/indexTable");
+    bpf_map__unpin(map_sourceSymbolBuffer, "/sys/fs/bpf/simple_me/sourceSymbolBuffer");
+    bpf_map__unpin(map_repairSymbolBuffer, "/sys/fs/bpf/simple_me/repairSymbolBuffer");
     simple_lwt_seg6local_bpf__destroy(skel);
 cleanup:
-    bpf_object__unpin_programs(skel->obj, "/sys/fs/bpf/simple_me");
     return 0;
 }
