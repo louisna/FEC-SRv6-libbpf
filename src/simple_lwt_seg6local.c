@@ -91,14 +91,14 @@ int main(int argc, char **argv) {
 
     struct bpf_map *map_repairSymbolBuffer = skel->maps.repairSymbolBuffer;
     int map_fd_repairSymbolBuffer = bpf_map__fd(map_repairSymbolBuffer);
-    struct sourceSymbol_t repair_zero = {};
+    struct repairSymbol_t repair_zero = {};
     bpf_map_update_elem(map_fd_repairSymbolBuffer, &k0, &repair_zero, BPF_ANY);
 
     while (!exiting) {
         const int k = 0;
-        uint16_t val = -1;
-        bpf_map_lookup_elem(map_fd_indexTable, &k, &val);
-        printf("Value de val:%d\n", val);
+        struct repairSymbol_t repair;
+        bpf_map_lookup_elem(map_fd_repairSymbolBuffer, &k, &repair);
+        printf("Val from pointer: %u\n", repair.tlv[0]);
         sleep(1);
     }
 
