@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
     bpf_object__pin(skel->obj, "/sys/fs/bpf/simple_me");
 
     char *cmd = "sudo ip -6 route add fc00::a encap seg6local action End.BPF endpoint fd /sys/fs/bpf/simple_me/lwt_seg6local section notify_ok dev enp0s3";
-    printf("Command is %sn", cmd);
+    printf("Command is %s\n", cmd);
     //system(cmd);
 
     int k0 = 0;
