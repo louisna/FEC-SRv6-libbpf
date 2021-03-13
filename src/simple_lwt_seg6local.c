@@ -8,6 +8,19 @@
 #include <bpf/libbpf.h>
 #include "simple_lwt_seg6local.skel.h"
 #include <bpf/bpf.h>
+#include "fec_srv6.h"
+
+/* Structures */
+struct sourceSymbol_t {
+    unsigned char packet[MAX_PACKET_SIZE];
+    uint16_t packet_length;
+} BPF_PACKET_HEADER;
+
+struct repairSymbol_t {
+    unsigned char packet[MAX_PACKET_SIZE];
+    int packet_length;
+    unsigned char tlv[sizeof(struct coding_repair2_t)];
+};
 
 /* Used to detect the end of the program */
 static volatile bool exiting = 0;
@@ -66,14 +79,20 @@ int main(int argc, char **argv) {
     printf("Command is %sn", cmd);
     //system(cmd);
 
+    int k0 = 0;
+
     struct bpf_map *map_indexTable = skel->maps.indexTable;
     int map_fd_indexTable = bpf_map__fd(map_indexTable);
 
     struct bpf_map *map_sourceSymbolBuffer = skel->maps.sourceSymbolBuffer;
     int map_fd_sourceSymbolBuffer = bpf_map__fd(map_sourceSymbolBuffer);
+    struct sourceSymbol_t source_zero = {};
+    bpf_map_update_elem(map_fd_sourceSymbolBuffer, &k0, &source_zero, BPF_ANY);
 
     struct bpf_map *map_repairSymbolBuffer = skel->maps.repairSymbolBuffer;
     int map_fd_repairSymbolBuffer = bpf_map__fd(map_repairSymbolBuffer);
+    struct sourceSymbol_t repair_zero = {};
+    bpf_map_update_elem(map_fd_repairSymbolBuffer, &k0, &repair_zero, BPF_ANY);
 
     while (!exiting) {
         const int k = 0;
