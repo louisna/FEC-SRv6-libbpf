@@ -10,7 +10,28 @@
 #include <bpf/bpf.h>
 #include "fec_srv6.h"
 
-// TODO: structures ?
+#define MAX_BLOCK 5  // Number of blocks we can simultaneously store
+
+/* Structures */
+struct sourceSymbol_t {
+    struct coding_source_t tlv;
+    unsigned char packet[MAX_PACKET_SIZE];
+    unsigned short packet_length;
+} BPF_PACKET_HEADER;
+
+struct repairSymbol_t {
+    unsigned char packet[MAX_PACKET_SIZE];
+    int packet_length; // TODO: change to u16 ?
+    struct coding_repair2_t tlv;
+};
+
+struct sourceBlock_t {
+    unsigned short blockID;
+    unsigned char rceivedSource;
+    unsigned char receivedRepair;
+    unsigned char nss;
+    unsigned char nrs;
+};
 
 /* Used to detect the end of the program */
 static volatile bool exiting = 0;
@@ -73,18 +94,27 @@ int main(int argc, char **argv)
     char *cmd = "sudo ip -6 route add fc00::9 encap seg6local action End.BPF endpoint fd /sys/fs/bpf/decoder/lwt_seg6local section decode dev enp0s3";
     printf("Command is %s\n", cmd);
 
+    int k0 = 0;
+
     /* Get file descriptor of maps and init the value of the structures */
     struct bpf_map *map_sourceSymbolBuffer = skel->maps.sourceSymbolBuffer;
     int map_fd_sourceSymbolBuffer = bpf_map__fd(map_sourceSymbolBuffer);
-    // TODO: init
+    struct sourceSymbol_t source_zero = {};
+    bpf_map_update_elem(map_fd_sourceSymbolBuffer, &k0, &source_zero, BPF_ANY);
 
     struct bpf_map *map_repairSymbolBuffer = skel->maps.repairSymbolBuffer;
     int map_fd_repairSymbolBuffer = bpf_map__fd(map_repairSymbolBuffer);
-    // TODO: init
+    for (int i = 0; i < MAX_BLOCK; ++i) { // Init each entry of the buffer
+        struct repairSymbol_t repair_zero = {};
+        bpf_map_update_elem(map_fd_repairSymbolBuffer, &i, &repair_zero, BPF_ANY);
+    }
 
     struct bpf_map *map_blockBuffer = skel->maps.blockBuffer;
     int map_fd_blockBuffer = bpf_map__fd(map_blockBuffer);
-    // TODO: init
+    for (int i = 0; i < MAX_BLOCK; ++i) { // Init each entry of the buffer
+        struct sourceBlock_t block_zero = {};
+        bpf_map_update_elem(map_fd_blockBuffer, &i, &block_zero, BPF_ANY);
+    }
 
     while (!exiting) {
         printf("Waiting for some information...\n");
