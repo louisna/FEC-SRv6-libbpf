@@ -73,17 +73,30 @@ int main(int argc, char **argv)
     char *cmd = "sudo ip -6 route add fc00::9 encap seg6local action End.BPF endpoint fd /sys/fs/bpf/decoder/lwt_seg6local section decode dev enp0s3";
     printf("Command is %s\n", cmd);
 
-    /* Get maps and init their value */
-    // TODO
+    /* Get file descriptor of maps and init the value of the structures */
+    struct bpf_map *map_sourceSymbolBuffer = skel->maps.sourceSymbolBuffer;
+    int map_fd_sourceSymbolBuffer = bpf_map__fd(map_sourceSymbolBuffer);
+    // TODO: init
+
+    struct bpf_map *map_repairSymbolBuffer = skel->maps.repairSymbolBuffer;
+    int map_fd_repairSymbolBuffer = bpf_map__fd(map_repairSymbolBuffer);
+    // TODO: init
+
+    struct bpf_map *map_blockBuffer = skel->maps.blockBuffer;
+    int map_fd_blockBuffer = bpf_map__fd(map_blockBuffer);
+    // TODO: init
 
     while (!exiting) {
-        printf("Waiting for some information...");
+        printf("Waiting for some information...\n");
         sleep(3);
     }
 
     // We reach this point when we Ctrl+C with signal handling
     /* Unpin the program and the maps to clean at exit */
-    bpf_object__unpin_programs(skel->obj, "/sys/fs/bpf/decoder");
+    bpf_object__unpin_programs(skel->obj,  "/sys/fs/bpf/decoder");
+    bpf_map__unpin(map_sourceSymbolBuffer, "/sys/fs/bpf/decoder/sourceSymbolBuffer");
+    bpf_map__unpin(map_repairSymbolBuffer, "/sys/fs/bpf/decoder/repairSymbolBuffer");
+    bpf_map__unpin(map_blockBuffer,        "/sys/fs/bpf/decoder/blockBuffer");
     decoder_bpf__destroy(skel);
 cleanup:
     return 0;

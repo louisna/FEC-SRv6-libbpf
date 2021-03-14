@@ -81,6 +81,7 @@ int main(int argc, char **argv) {
 
     int k0 = 0;
 
+    /* Get file descriptor of maps and init the value of the structures */
     struct bpf_map *map_indexTable = skel->maps.indexTable;
     int map_fd_indexTable = bpf_map__fd(map_indexTable);
 
@@ -104,8 +105,8 @@ int main(int argc, char **argv) {
 
     // We reach this point when we Ctrl+C with signal handling
     /* Unpin the program and the maps to clean at exit */
-    bpf_object__unpin_programs(skel->obj, "/sys/fs/bpf/simple_me");
-    bpf_map__unpin(map_indexTable, "/sys/fs/bpf/simple_me/indexTable");
+    bpf_object__unpin_programs(skel->obj,  "/sys/fs/bpf/simple_me");
+    bpf_map__unpin(map_indexTable,         "/sys/fs/bpf/simple_me/indexTable");
     bpf_map__unpin(map_sourceSymbolBuffer, "/sys/fs/bpf/simple_me/sourceSymbolBuffer");
     bpf_map__unpin(map_repairSymbolBuffer, "/sys/fs/bpf/simple_me/repairSymbolBuffer");
     simple_lwt_seg6local_bpf__destroy(skel);
