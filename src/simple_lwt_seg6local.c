@@ -46,16 +46,34 @@ static void bump_memlock_rlimit(void) {
 	}
 }
 
-static void send_repair_symbol(void *ctx, int cpu, void *data, __u32 data_sz) {
-    printf("Received a perf notification !\n");
+static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz) {
+    /* Get the repairSymbol
+     * ->packet: the repair symbol
+     * ->packet_length: the length of the repair symbol
+     * ->tlv: the TLV to be added in the SRH header 
+     */
+    const struct repairSymbol_t *repairSymbol = (struct repairSymbol_t *)data;
 
-    return;
+    // TODO: create the packet with as payload: repairSymbol->packet[:repairSymbol->packet_length]
+    /* IPv6 header */
+    // TODO
+
+    /* Segment Routing v6 header */
+    // TODO
+
+    /* Useless UDP header */
+    // TODO
+
+    /* Payload */
+    // TODO
+
+    // TODO: send the packet
 }
 
 static void handle_events(int map_fd_events) {
     /* Define structure for the perf event */
     struct perf_buffer_opts pb_opts = {
-        .sample_cb = send_repair_symbol,
+        .sample_cb = send_repairSymbol_XOR,
     };
     struct perf_buffer *pb = NULL;
     int err;

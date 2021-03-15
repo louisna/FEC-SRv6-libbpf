@@ -46,7 +46,7 @@ struct {
 struct {
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
     __uint(key_size, sizeof(u32));
-    __uint(value_size, sizeof(u32)); // Could be just a bool...
+    __uint(value_size, sizeof(struct repairSymbol_t));
 } events SEC(".maps");
 
 static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymbol_t *repairSymbol)
@@ -267,15 +267,15 @@ int notify_ok(struct __sk_buff *skb)
     }
 
     /* Send repair symbol(s) */
-    if (err == 1) {
-        struct repairSymbol_t *repair = bpf_map_lookup_elem(&repairSymbolBuffer, &k);
-        if (!repair) {
+    if (err == 1) { // The folloing is very specific to the XOR coding function
+        struct repairSymbol_t *repairSymbol = bpf_map_lookup_elem(&repairSymbolBuffer, &k);
+        if (!repairSymbol) {
             if (DEBUG) bpf_printk("Sender: impossible to get full repair symbol from buffer\n");
             return BPF_ERROR;
         }
 
         /* Submit repair symbol(s) to User Space using perf events */
-        bpf_perf_event_output(skb, &events, BPF_F_CURRENT_CPU, &err, sizeof(u32));
+        bpf_perf_event_output(skb, &events, BPF_F_CURRENT_CPU, repairSymbol, sizeof(struct repairSymbol_t));
         bpf_printk("Sent bpf event event to user space\n");
     }
 
