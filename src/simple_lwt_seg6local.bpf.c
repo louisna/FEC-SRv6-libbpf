@@ -74,7 +74,7 @@ static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymb
     }
 
     /* Get the source symbol from the buffer to store a copy of the packet */
-    struct sourceSymbol_t *sourceSymbol =  bpf_map_lookup_elem(&sourceSymbolBuffer, &k);
+    struct sourceSymbol_t *sourceSymbol = bpf_map_lookup_elem(&sourceSymbolBuffer, &k);
     if (!sourceSymbol) {
         if (DEBUG) bpf_printk("Sender: impossible to get a pointer to store the source symbol\n");
         return -1;
@@ -115,7 +115,7 @@ static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymb
      * Destination address
      * Hot Limit
      */
-    struct ip6_t *source_ipv6 = (struct ip6_t *)sourceSymbol;
+    struct ip6_t *source_ipv6 = (struct ip6_t *)sourceSymbol->packet;
     source_ipv6->dst_hi    = 0;
     source_ipv6->dst_lo    = 0;
     source_ipv6->hop_limit = 0;
