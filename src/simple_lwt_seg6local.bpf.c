@@ -42,7 +42,12 @@ struct {
     __type(value, struct repairSymbol_t);
 } repairSymbolBuffer SEC(".maps");
 
-// TODO: perf output map
+/* Perf even buffer */
+struct {
+    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+    __uint(key_size, sizeof(u32));
+    __uint(value_size, sizeof(u32)); // Could be just a bool...
+} events SEC(".maps");
 
 static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymbol_t *repairSymbol)
 {
@@ -235,7 +240,7 @@ static __always_inline int fecFramework(struct __sk_buff *skb, struct coding_sou
     bpf_map_update_elem(&indexTable, &k0, &sourceBlock, BPF_ANY);
     bpf_map_update_elem(&indexTable, &k1, &sourceSymbolCount, BPF_ANY);
 
-    return 0;
+    return err;
 }
 
 SEC("lwt_seg6local")
@@ -270,7 +275,8 @@ int notify_ok(struct __sk_buff *skb)
         }
 
         /* Submit repair symbol(s) to User Space using perf events */
-        // TODO
+        bpf_perf_event_output(skb, &events, BPF_F_CURRENT_CPU, &err, sizeof(u32));
+        bpf_printk("Sent bpf event event to user space\n");
     }
 
     /* Add the TLV to the current source symbol and forward */

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/resource.h>
+#include <errno.h>
 #include <bpf/libbpf.h>
 #include "simple_lwt_seg6local.skel.h"
 #include <bpf/bpf.h>
@@ -43,6 +44,44 @@ static void bump_memlock_rlimit(void) {
 		fprintf(stderr, "Failed to increase RLIMIT_MEMLOCK limit!\n");
 		exit(1);
 	}
+}
+
+static void send_repair_symbol(void *ctx, int cpu, void *data, __u32 data_sz) {
+    printf("Received a perf notification !\n");
+
+    return;
+}
+
+static void handle_events(int map_fd_events) {
+    /* Define structure for the perf event */
+    struct perf_buffer_opts pb_opts = {
+        .sample_cb = send_repair_symbol,
+    };
+    struct perf_buffer *pb = NULL;
+    int err;
+
+    pb = perf_buffer__new(map_fd_events, 128, &pb_opts);
+    err = libbpf_get_error(pb);
+    if (err) {
+        pb = NULL;
+        fprintf(stderr, "Impossible to open perf event\n");
+        goto cleanup;
+    }
+
+    /* Enter in loop until a signal is retrieved
+     * Poll the notification from the BPF program means that we can
+     * retrieve information from a repairSymbol_t and send it to the decoder router
+     */
+    while (!exiting) {
+        err = perf_buffer__poll(pb, 100);
+        if (err < 0 && errno != EINTR) {
+            fprintf(stderr, "Error polling perf buffer: %d\n", err);
+            goto cleanup;
+        }
+    }
+
+cleanup:
+    perf_buffer__free(pb);
 }
 
 int main(int argc, char **argv) {
@@ -95,13 +134,12 @@ int main(int argc, char **argv) {
     struct repairSymbol_t repair_zero = {};
     bpf_map_update_elem(map_fd_repairSymbolBuffer, &k0, &repair_zero, BPF_ANY);
 
-    while (!exiting) {
-        const int k = 0;
-        struct repairSymbol_t repair;
-        bpf_map_lookup_elem(map_fd_repairSymbolBuffer, &k, &repair);
-        printf("Val from pointer: %u\n", repair.tlv[0]);
-        sleep(1);
-    }
+    struct bpf_map *map_events = skel->maps.events;
+    int map_fd_events = bpf_map__fd(map_events);
+
+    /* Enter perf event handling for packet recovering */
+    handle_events(map_fd_events);
+
 
     // We reach this point when we Ctrl+C with signal handling
     /* Unpin the program and the maps to clean at exit */
@@ -109,6 +147,8 @@ int main(int argc, char **argv) {
     bpf_map__unpin(map_indexTable,         "/sys/fs/bpf/simple_me/indexTable");
     bpf_map__unpin(map_sourceSymbolBuffer, "/sys/fs/bpf/simple_me/sourceSymbolBuffer");
     bpf_map__unpin(map_repairSymbolBuffer, "/sys/fs/bpf/simple_me/repairSymbolBuffer");
+    // Do not know if I have to unpin the perf event too
+    bpf_map__unpin(map_events, "/sys/fs/bpf/simple_me/events");
     simple_lwt_seg6local_bpf__destroy(skel);
 cleanup:
     return 0;
