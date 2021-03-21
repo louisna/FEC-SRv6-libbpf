@@ -46,7 +46,7 @@ struct {
 struct {
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
     __uint(key_size, sizeof(u32));
-    __uint(value_size, sizeof(struct repairSymbol_t));
+    __uint(value_size, sizeof(u32));
 } events SEC(".maps");
 
 static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymbol_t *repairSymbol)

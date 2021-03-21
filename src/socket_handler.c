@@ -9,7 +9,7 @@
 #include <strings.h>
 #include <unistd.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
+
 #include <netdb.h>
 #include <sys/types.h>
 #include <sys/times.h>
@@ -17,19 +17,21 @@
 #include <signal.h>
 #include <arpa/inet.h>
 #include <netinet/icmp6.h>
-#include <bits/socket.h>
-#include <netinet/ip6.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 #include <sys/ioctl.h>
 #include <bits/ioctls.h>
-#include <net/if.h>
 #include <linux/if_ether.h>
-#include <linux/if_packet.h>
 #include <net/ethernet.h>
-#include <pcap.h>
 #include <time.h>
 #include "fec_srv6.h"
+#include "socket_handler.h"
+#include <net/if.h>
+#include <netinet/ip6.h>
+#include <bits/socket.h>
+#include <linux/if_packet.h>
+
+#include <pcap.h>
 
 #define ETH_HDRLEN 14
 
@@ -263,6 +265,8 @@ void open_raw_socket() {
  
   /* Copy source MAC address into src_mac */
   memcpy (src_mac, ifr.ifr_hwaddr.sa_data, 6 * sizeof (uint8_t)); 
+  char *macStr = "08:00:27:78:1f:af";
+    sscanf(macStr, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &src_mac[0], &src_mac[1], &src_mac[2], &src_mac[3], &src_mac[4], &src_mac[5]);
  
   /* Find interface index from interface name and store index in 
      struct sockaddr_ll device, which will be used as an argument of sendto().  */
@@ -278,14 +282,14 @@ void open_raw_socket() {
   device.sll_halen = 6; 
  
   /* Submit request for a raw socket descriptor. */
-  if ((sd = socket (PF_PACKET, SOCK_RAW, htons (ETH_P_ALL))) < 0) { 
+  if ((sd = socket (AF_INET6, SOCK_RAW, IPPROTO_IPV6)) < 0) { 
     perror ("socket() failed "); 
     exit (EXIT_FAILURE); 
     }
   return;
   } 
 
-int send_coded_packet(struct sockaddr_in6 *srcaddr, struct sockaddr_in6 *dstaddr, char *bpf_payload, uint16_t payload_length, char *tlv) {
+int send_coded_packet(struct sockaddr_in6 *srcaddr, struct sockaddr_in6 *dstaddr, const unsigned char *bpf_payload, uint16_t payload_length, const unsigned char *tlv) {
     printf("Coucou\n");
     char out_packet_buffer[4500];
     char payload[4500];
@@ -336,7 +340,25 @@ int send_coded_packet(struct sockaddr_in6 *srcaddr, struct sockaddr_in6 *dstaddr
     srh->first_segment = 1; // Only two segments
     srh->flags         = 0; // Unusued
     srh->tag           = 0; // Unusued
-    // TODO: add segments
+    
+    /* Add segments */
+    // TODO: for now it is hardcoded
+    uint16_t src_bits[8];
+    uint16_t dst_bits[8];
+
+    if (inet_pton(AF_INET6, "::1", src_bits) != 1) {
+        printf("Error converting source address\n");
+        return -1;
+    }
+    if (inet_pton(AF_INET6, "::2", dst_bits) != 1) {
+        printf("Error converting the destination address\n");
+        return -1;
+    }
+
+    /* Add the segments */
+    uint8_t *segment_ptr = (uint8_t *)&out_packet_buffer[40 + 8];
+    memcpy(segment_ptr, src_bits, 16);
+    memcpy(segment_ptr + 16, dst_bits, 16);
 
     /* Compute the length of the IPv6 SRH and add padding if needed */
     uint16_t current_srh_len = 2 * 16 + sizeof(struct coding_repair2_t); // Should be 48 bytes
@@ -353,7 +375,9 @@ int send_coded_packet(struct sockaddr_in6 *srcaddr, struct sockaddr_in6 *dstaddr
     iphdr->ip6_plen = htons(8 + 16 + 16 + sizeof(struct coding_repair2_t) + 8 + payload_length);
 
     /* Destination and Source MAC addresses */
-    memcpy(ether_frame, src_mac, 6 * sizeof(uint8_t));
+    char *macStr = "00:00:00:00:00:00";
+    sscanf(macStr, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &dst_mac[0], &dst_mac[1], &dst_mac[2], &dst_mac[3], &dst_mac[4], &dst_mac[5]);
+    memcpy(ether_frame, dst_mac, 6 * sizeof(uint8_t));
     memcpy(ether_frame + 6, src_mac, 6 * sizeof(uint8_t));
 
     /* Next is ethernet type code (ETH_P_IPV6 for IPv6) */
@@ -369,17 +393,22 @@ int send_coded_packet(struct sockaddr_in6 *srcaddr, struct sockaddr_in6 *dstaddr
     /* Payload fragment */
     memcpy(ether_frame + ETH_HDRLEN + 40 + 8 + 16 + 16 + 8, payload, 8 + payload_length);
 
+    memcpy(out_packet_buffer + 40 + 8 + 16 + 16 + 16, payload, 8 + payload_length);
+    int packet_length = 40 + 8 + 16 + 16 + 16 + 8 + payload_length;
+
     /* Send ethernet frame to socket */
-    if ((bytes = sendto(sd, ether_frame, frame_length, 0, (struct sockaddr *)&device, sizeof(device))) <= 0) {
+    if ((bytes = sendto(sd, out_packet_buffer, packet_length, 0, (struct sockaddr *)dstaddr, sizeof(*dstaddr))) <= 0) {
         fprintf(stderr, "Failed to send\n");
         return -1;
     }
-    printf("Sent the packet\n");
+    printf("Sent the packet: %d\n", bytes);
+    close(sd);
 
     return 0;
 }
 
-int main(){
+int send_repair(char *src_string, char *dst_string, const unsigned char *repair_symbol, uint16_t repair_symbol_length,
+                const unsigned char *repair_tlv) {
     struct sockaddr_in6 src;
     struct sockaddr_in6 dst;
     int sockfd;
@@ -394,13 +423,7 @@ int main(){
     // Set "interface" and "host" and "dst_mac" ?
     open_raw_socket();
 
-    sockfd = socket(AF_INET6, SOCK_DGRAM, 17);
-    if (sockfd < 0) {
-        fprintf(stderr, "Socket");
-        return EXIT_FAILURE;
-    }
-
-    if (((status  = inet_pton(AF_INET6, "::1", (void *)(&src.sin6_addr)))) <= 0) {
+    if (((status  = inet_pton(AF_INET6, src_string, (void *)(&src.sin6_addr)))) <= 0) {
         if (!status)
             fprintf(stderr, "Not in presentation format");
         else
@@ -415,14 +438,10 @@ int main(){
         exit(EXIT_FAILURE);
     }
 
+    printf("L'adresse devient %s\n", str);
 
+    status = inet_pton(AF_INET6, dst_string, (void *)&(dst.sin6_addr));
 
-    if (bind(sockfd, (const struct sockaddr *)&src, sizeof(src))) {
-        perror("bind");
-        exit(EXIT_FAILURE);
-    }
-
-    status = inet_pton(AF_INET6, "::1", (void *)&(dst.sin6_addr));
-
-    send_coded_packet(&src, &dst, "AAAAAAAAAAAA", 6, "XXXXXXX");
+    send_coded_packet(&src, &dst, repair_symbol, repair_symbol_length, repair_tlv);
+    return 0;
 }

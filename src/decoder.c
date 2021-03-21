@@ -117,7 +117,7 @@ int main(int argc, char **argv)
     }
 
     while (!exiting) {
-        printf("Waiting for some information...\n");
+        //printf("Waiting for some information...\n");
         sleep(3);
     }
 

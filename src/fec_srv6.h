@@ -1,3 +1,6 @@
+#ifndef FEC_SRH_H_
+#define FEC_SRH_H_
+
 #define TLV_CODING_SOURCE 156
 #define TLV_CODING_REPAIR 157
 #define MAX_PACKET_SIZE 512
@@ -23,3 +26,5 @@ struct coding_repair2_t {
     unsigned char nrs; // Number of Repair Symbols
     unsigned short padding;
 } BPF_PACKET_HEADER;
+
+#endif

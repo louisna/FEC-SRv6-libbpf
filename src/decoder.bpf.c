@@ -321,6 +321,8 @@ static __always_inline u16 fecFrameworkRepair(struct __sk_buff *skb, int tlv_off
     int err;
     int k0 = 0;
 
+    bpf_printk("Receiver: TRIGGERED FROM REPAIR SYMBOL\n");
+
     /* Here must first load the repair TLV to know the source block, to load the good repair pointer */
     struct coding_repair2_t tlv;
     err = bpf_skb_load_bytes(skb, tlv_offset, &tlv, sizeof(struct coding_repair2_t));
