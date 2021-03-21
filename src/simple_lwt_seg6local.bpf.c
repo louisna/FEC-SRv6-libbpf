@@ -1,5 +1,11 @@
-#include "vmlinux.h"
+#ifndef VMLINUX_H_
+#define VMLINUX_H_
+#include <linux/bpf.h>
+#endif
+#ifndef BPF_HELPERS_H_
+#define BPF_HELPERS_H_
 #include <bpf/bpf_helpers.h>
+#endif
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
 #include "fec_srv6.h"
@@ -11,7 +17,7 @@
 /* Structures */
 struct sourceSymbol_t {
     unsigned char packet[MAX_PACKET_SIZE];
-    uint16_t packet_length;
+    unsigned short packet_length;
 } BPF_PACKET_HEADER;
 
 struct repairSymbol_t {
@@ -24,29 +30,29 @@ struct repairSymbol_t {
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 2);
-	__type(key, u32);
-	__type(value, u16);
+	__type(key, unsigned int);
+	__type(value, unsigned short);
 } indexTable SEC(".maps");
 
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 1);
-    __type(key, u32);
+    __type(key, unsigned int);
     __type(value, struct sourceSymbol_t);
 } sourceSymbolBuffer SEC(".maps");
 
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 1);
-    __type(key, u32);
+    __type(key, unsigned int);
     __type(value, struct repairSymbol_t);
 } repairSymbolBuffer SEC(".maps");
 
 /* Perf even buffer */
 struct {
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-    __uint(key_size, sizeof(u32));
-    __uint(value_size, sizeof(u32));
+    __uint(key_size, sizeof(unsigned int));
+    __uint(value_size, sizeof(unsigned int));
 } events SEC(".maps");
 
 static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymbol_t *repairSymbol)
@@ -66,7 +72,7 @@ static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymb
     }
 
     /* Get the packet length from the IPv6 header to the end of the payload */
-    u32 packet_len = ((long)data_end) - ((long)(void *)ip6);
+    unsigned int packet_len = ((long)data_end) - ((long)(void *)ip6);
     if ((void *)ip6 + packet_len > data_end) {
         if (DEBUG) bpf_printk("Sender: inconsistent payload length\n");
         return -1;
@@ -86,11 +92,11 @@ static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymb
     }
     memset(sourceSymbol, 0, sizeof(struct sourceSymbol_t)); // Clean the source symbol from previous packet
 
-    u32 ipv6_offset = (long)ip6 - (long)data;
+    unsigned int ipv6_offset = (long)ip6 - (long)data;
     if (ipv6_offset < 0) return -1;
     
     /* Load the payload of the packet and store it in sourceSymbol */
-    const u16 size = packet_len - 1; // Small trick here because the verifier thinks the value can be negative
+    const unsigned short size = packet_len - 1; // Small trick here because the verifier thinks the value can be negative
     if (size < sizeof(sourceSymbol->packet) && ipv6_offset + size <= (long)data_end) {
         // TODO: 0xffff should be set as global => ensures that the size is the max classic size of IPv6 packt
         err = bpf_skb_load_bytes(skb, ipv6_offset, (void *)sourceSymbol->packet, (size & 0xffff) + 1);
@@ -126,10 +132,10 @@ static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymb
     source_ipv6->hop_limit = 0;
 
     /* PERFORM XOR using 64 bits to have less iterations */
-    u64 *source_long = (u64 *)sourceSymbol->packet;
-    u64 *repair_long = (u64 *)repairSymbol->packet;
+    unsigned long *source_long = (unsigned long *)sourceSymbol->packet;
+    unsigned long *repair_long = (unsigned long *)repairSymbol->packet;
     int j;
-    for (j = 0; j < MAX_PACKET_SIZE / sizeof(u64); ++j) {
+    for (j = 0; j < MAX_PACKET_SIZE / sizeof(unsigned long); ++j) {
         repair_long[j] = repair_long[j] ^ source_long[j];
     }
 
@@ -142,7 +148,7 @@ static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymb
     return 0;
 }
 
-static __always_inline int codingXOR_on_the_line(struct __sk_buff *skb, u16 sourceBlock, u16 sourceSymbolCount) 
+static __always_inline int codingXOR_on_the_line(struct __sk_buff *skb, unsigned short sourceBlock, unsigned short sourceSymbolCount) 
 {
     int err;
     int k0 = 0;
@@ -190,9 +196,9 @@ static __always_inline int fecFramework(struct __sk_buff *skb, struct coding_sou
 {
     int err;
     int k0 = 0; int k1 = 1;
-    u16 *sourceBlock_p       = bpf_map_lookup_elem(&indexTable, &k0);
-    u16 *sourceSymbolCount_p = bpf_map_lookup_elem(&indexTable, &k1);
-    u16 sourceBlock; u16 sourceSymbolCount;
+    unsigned short *sourceBlock_p       = bpf_map_lookup_elem(&indexTable, &k0);
+    unsigned short *sourceSymbolCount_p = bpf_map_lookup_elem(&indexTable, &k1);
+    unsigned short sourceBlock; unsigned short sourceSymbolCount;
 
     /* Get current values of source block */
     if (!sourceBlock_p)
@@ -280,7 +286,7 @@ int notify_ok(struct __sk_buff *skb)
     }
 
     /* Add the TLV to the current source symbol and forward */
-    u16 tlv_length = sizeof(struct coding_source_t);
+    unsigned short tlv_length = sizeof(struct coding_source_t);
     err = seg6_add_tlv(skb, srh, (srh->hdrlen + 1) << 3, (struct sr6_tlv_t *)&tlv, tlv_length);
     if (DEBUG) bpf_printk("Sender: return value of TLV add: %d\n", err);
     return (err) ? BPF_ERROR : BPF_OK;

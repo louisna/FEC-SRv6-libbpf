@@ -34,7 +34,100 @@ struct sourceBlock_t {
 };
 
 /* Used to detect the end of the program */
-static volatile bool exiting = 0;
+static volatile int exiting = 0;
+
+static volatile int sfd = -1;
+
+int send_raw_socket(const struct repairSymbol_t *repairSymbol, char *srcaddr, char *dstaddr) {
+    struct sockaddr_in6 src;
+    struct sockaddr_in6 dst;
+    uint8_t packet[4200];
+    size_t packet_length;
+    struct ip6_hdr *iphdr;
+    struct ipv6_sr_hdr *srh;
+    struct udphdr *uhdr;
+    size_t ip6_length = 40;
+    size_t srh_length = 0;
+    size_t tlv_length = 0;
+    size_t udp_length = 8;
+    size_t pay_length = repairSymbol->packet_length;
+    int bytes; // Number of sent bytes
+
+    if (sfd < 0) {
+        fprintf(stderr, "The socket is not initialized\n");
+        return -1;
+    }
+
+    /* IPv6 header */
+    iphdr = (struct ip6_hdr *)&packet[0];
+    iphdr->ip6_flow = htonl((6 << 28) | (0 << 20) | 0);
+    iphdr->ip6_nxt  = 43; // Nxt hdr = Routing header
+    iphdr->ip6_hops = 44;
+    iphdr->ip6_plen = 0; // Changed later
+
+    /* IPv6 Source address */
+    memset(&src, 0, sizeof(src));
+    src.sin6_family = AF_INET6;
+    if (inet_pton(AF_INET6, srcaddr, src.sin6_addr.s6_addr) != 1) {
+        perror("inet ntop src");
+        return -1;
+    }
+    bcopy(&src.sin6_addr, &(iphdr->ip6_src), 16);
+
+	/* IPv6 Destination address */
+    memset(&src, 0, sizeof(dst));
+	dst.sin6_family = AF_INET6;
+	if (inet_pton(AF_INET6, dstaddr, dst.sin6_addr.s6_addr) != 1) {
+		perror("inet_ntop dst");
+		return -1;
+	}
+	bcopy(&dst.sin6_addr, &(iphdr->ip6_dst), 16);
+
+    /* Segment Routing header */
+    srh = (struct ipv6_sr_hdr *)&packet[ip6_length];
+    srh_length = sizeof(struct ipv6_sr_hdr) + 16 + 16;
+    srh->nexthdr = 17; // UDP
+    srh->hdrlen = 4 + 2;
+    srh->type = 4;
+    srh->segments_left = 1;
+    srh->first_segment = 1;
+    srh->flags = 0;
+    srh->tag = 0;
+
+    bcopy(&src.sin6_addr, &(srh->segments[0]), 16);
+    bcopy(&dst.sin6_addr, &(srh->segments[1]), 16);
+
+    /* TLV */
+    tlv_length = sizeof(struct coding_repair2_t);
+    uint8_t *tlv_pointer = &packet[ip6_length + srh_length];
+    bcopy(&repairSymbol->tlv, tlv_pointer, tlv_length);
+
+    /* UDP header */
+	uhdr = (struct udphdr *)&packet[ip6_length + srh_length + tlv_length];
+	uhdr->uh_sport = htons(50);
+	uhdr->uh_dport = htons(50);
+	uhdr->uh_ulen  = htons(pay_length);
+	uhdr->uh_sum   = 0; // Checksum computed later
+
+    /* Payload */
+	bcopy(repairSymbol->packet, &packet[ip6_length + srh_length + tlv_length + udp_length], pay_length);
+
+    /* Compute packet length */
+    packet_length = ip6_length + srh_length + tlv_length + udp_length + pay_length;
+    iphdr->ip6_plen = htons(srh_length + tlv_length + udp_length + pay_length);
+
+    /* Compute the UDP checksum */
+    uhdr->uh_sum = udp_checksum(uhdr, udp_length + pay_length, &src.sin6_addr, &dst.sin6_addr);
+
+    /* Send packet */
+    bytes = sendto(sfd, packet, packet_length, 0, (struct sockaddr *)&dst, sizeof(dst));
+    if (bytes != packet_length) {
+        perror("Impossible to send packet");
+        return -1;
+    }
+
+    return 0;
+}
 
 static void sig_handler(int sig)
 {

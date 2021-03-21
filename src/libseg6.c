@@ -1,5 +1,11 @@
-#include "vmlinux.h"
+#ifndef VMLINUX_H_
+#define VMLINUX_H_
+#include <linux/bpf.h>
+#endif
+#ifndef BPF_HELPERS_H_
+#define BPF_HELPERS_H_
 #include <bpf/bpf_helpers.h>
+#endif
 #include "proto.h"
 #include "all.h"
 
@@ -10,11 +16,11 @@ static __always_inline struct ip6_srh_t *seg6_get_srh(struct __sk_buff *skb)
 	void *cursor, *data_end;
 	struct ip6_srh_t *srh;
 	struct ip6_t *ip;
-	u8 *ipver;
+	unsigned char *ipver;
 
 	data_end = (void *)(long)skb->data_end;
 	cursor = (void *)(long)skb->data;
-	ipver = (u8 *)cursor;
+	ipver = (unsigned char *)cursor;
 
 	if ((void *)ipver + sizeof(*ipver) > data_end)
 		return 0;
@@ -39,8 +45,8 @@ static __always_inline struct ip6_srh_t *seg6_get_srh(struct __sk_buff *skb)
 	return srh;
 }
 
-static __always_inline int __update_tlv_pad(struct __sk_buff *skb, u32 new_pad,
-		     u32 old_pad, u32 pad_off)
+static __always_inline int __update_tlv_pad(struct __sk_buff *skb, unsigned int new_pad,
+		     unsigned int old_pad, unsigned int pad_off)
 {
 	int err;
 
@@ -69,10 +75,10 @@ static __always_inline int __update_tlv_pad(struct __sk_buff *skb, u32 new_pad,
 }
 
 static __always_inline int __is_valid_tlv_boundary(struct __sk_buff *skb, struct ip6_srh_t *srh,
-			    u32 *tlv_off, u32 *pad_size,
-			    u32 *pad_off)
+			    unsigned int *tlv_off, unsigned int *pad_size,
+			    unsigned int *pad_off)
 {
-	u32 srh_off, cur_off;
+	unsigned int srh_off, cur_off;
 	int offset_valid = 0;
 	int err;
 
@@ -126,14 +132,14 @@ static __always_inline int __is_valid_tlv_boundary(struct __sk_buff *skb, struct
 	return 0;
 }
 
-static __always_inline int seg6_add_tlv(struct __sk_buff *skb, struct ip6_srh_t *srh, u32 tlv_off,
-		 struct sr6_tlv_t *itlv, u8 tlv_size)
+static __always_inline int seg6_add_tlv(struct __sk_buff *skb, struct ip6_srh_t *srh, unsigned int tlv_off,
+		 struct sr6_tlv_t *itlv, unsigned char tlv_size)
 {
-	u32 srh_off = (char *)srh - (char *)(long)skb->data;
-	u8 len_remaining, new_pad;
-	u32 pad_off = 0;
-	u32 pad_size = 0;
-	u32 partial_srh_len;
+	unsigned int srh_off = (char *)srh - (char *)(long)skb->data;
+	unsigned char len_remaining, new_pad;
+	unsigned int pad_off = 0;
+	unsigned int pad_size = 0;
+	unsigned int partial_srh_len;
 	int err;
 
 	if (tlv_off != -1)
@@ -170,13 +176,13 @@ static __always_inline int seg6_add_tlv(struct __sk_buff *skb, struct ip6_srh_t 
 }
 
 static __always_inline int seg6_delete_tlv(struct __sk_buff *skb, struct ip6_srh_t *srh,
-		    u32 tlv_off)
+		    unsigned int tlv_off)
 {
-	u32 srh_off = (char *)srh - (char *)(long)skb->data;
-	u8 len_remaining, new_pad;
-	u32 partial_srh_len;
-	u32 pad_off = 0;
-	u32 pad_size = 0;
+	unsigned int srh_off = (char *)srh - (char *)(long)skb->data;
+	unsigned char len_remaining, new_pad;
+	unsigned int partial_srh_len;
+	unsigned int pad_off = 0;
+	unsigned int pad_size = 0;
 	struct sr6_tlv_t tlv;
 	int err;
 
@@ -233,13 +239,13 @@ static __always_inline int seg6_find_tlv(struct __sk_buff *skb, struct ip6_srh_t
 }
 
 static __always_inline int seg6_delete_tlv2(struct __sk_buff *skb, struct ip6_srh_t *srh,
-		    u32 tlv_off)
+		    unsigned int tlv_off)
 {
-	u32 srh_off = (char *)srh - (char *)(long)skb->data;
-	u8 len_remaining, new_pad;
-	u32 partial_srh_len;
-	u32 pad_off = 0;
-	u32 pad_size = 0;
+	unsigned int srh_off = (char *)srh - (char *)(long)skb->data;
+	unsigned char len_remaining, new_pad;
+	unsigned int partial_srh_len;
+	unsigned int pad_off = 0;
+	unsigned int pad_size = 0;
 	struct sr6_tlv_t tlv;
 	int err;
 
@@ -269,7 +275,7 @@ static __always_inline int seg6_delete_tlv2(struct __sk_buff *skb, struct ip6_sr
 	return __update_tlv_pad(skb, new_pad, pad_size, pad_off);
 }
 
-static __always_inline int seg6_find_tlv2(struct __sk_buff *skb, struct ip6_srh_t *srh, int *tlv_type, u8 source_tlv_length, u8 repair_tlv_length)
+static __always_inline int seg6_find_tlv2(struct __sk_buff *skb, struct ip6_srh_t *srh, int *tlv_type, unsigned char source_tlv_length, unsigned char repair_tlv_length)
 		  // TODO: replace all args by structure for typeX, lenX
 {
 	int srh_offset = (char *)srh - (char *)(long)skb->data;
@@ -309,7 +315,7 @@ static __always_inline void *seg6_find_payload(struct __sk_buff *skb, struct ip6
 	void *data_end = (void *)(long)skb->data_end;
 	unsigned char nexthdr = srh->nexthdr;
 	unsigned char hdrlen = (srh->hdrlen + 1) << 3;
-	u16 opt_len;
+	unsigned short opt_len;
 	int err;
 
 	void *cursor = (void *)srh + hdrlen;
@@ -331,8 +337,8 @@ static __always_inline void *seg6_find_payload(struct __sk_buff *skb, struct ip6
 		}
 		if ((void *)cursor + opt_len > data_end)
 			return 0;
-		opt_len = (1 + (u16) *((u8 *) cursor + 1)) << 3;
-		nexthdr = (u16) *((u8 *)cursor);
+		opt_len = (1 + (unsigned short) *((unsigned char *) cursor + 1)) << 3;
+		nexthdr = (unsigned short) *((unsigned char *)cursor);
 		if (nexthdr == 6 || nexthdr == 17 || nexthdr == 132) {
 			cursor_advance(cursor, opt_len);
 			return cursor;
@@ -347,11 +353,11 @@ static inline struct ip6_t *seg6_get_ipv6(struct __sk_buff *skb)
 	void *cursor, *data_end;
 	struct ip6_srh_t *srh;
 	struct ip6_t *ip;
-	u8 *ipver;
+	unsigned char *ipver;
 
 	data_end = (void *)(long)skb->data_end;
 	cursor = (void *)(long)skb->data;
-	ipver = (u8 *)cursor;
+	ipver = (unsigned char *)cursor;
 
 	if ((void *)ipver + sizeof(*ipver) > data_end)
 		return 0;
