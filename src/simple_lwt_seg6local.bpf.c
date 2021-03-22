@@ -131,6 +131,16 @@ static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymb
     source_ipv6->dst_lo    = 0;
     source_ipv6->hop_limit = 0;
 
+    /* Also get the Segment Routing header. We must set the value of segment_left to 0
+     * as it will also be modified for the decoder
+     */
+    if (40 + sizeof(struct ip6_srh_t) > sizeof(sourceSymbol->packet)) {
+        if (DEBUG) bpf_printk("Sender: cannot get the SRH from the sourceSymbol\n");
+        return -1;
+    }
+    struct ip6_srh_t *srh = (struct ip6_srh_t *)(sourceSymbol->packet + 40);
+    srh->segments_left = 0;
+
     /* PERFORM XOR using 64 bits to have less iterations */
     unsigned long *source_long = (unsigned long *)sourceSymbol->packet;
     unsigned long *repair_long = (unsigned long *)repairSymbol->packet;

@@ -158,9 +158,15 @@ static __always_inline int decodingSourceXOR_on_the_line(struct __sk_buff *skb, 
      * remove the TLV. We need to locally update this value in the sourceSymbol version of the packet.
      * We cannot use seg6_get_srh because we work with local structure and not with __sk_buff
      */
-    if (30 + sizeof(struct ip6_srh_t) > sizeof(sourceSymbol->packet)) return -1;
+    if (40 + sizeof(struct ip6_srh_t) > sizeof(sourceSymbol->packet)) {
+        if (DEBUG) bpf_printk("Receiver: cannot get the SRH from the sourceSymbol\n");
+        return -1;
+    }
     struct ip6_srh_t *srh = (struct ip6_srh_t *)(sourceSymbol->packet + 40); // Skip IPv6 header
     srh->hdrlen -= 1; // TODO: more clean ?
+
+    /* Also remove the segment_left entry of the Segment Routing header as it varied from the encoder */
+    srh->segments_left = 0;
 
     /* PERFORM XOR using 64 bites to have less iterations */
     unsigned long *source_long = (unsigned long *)sourceSymbol->packet;
@@ -478,7 +484,7 @@ int decode(struct __sk_buff *skb) {
     }
 
     if (DEBUG) bpf_printk("Receiver: done FEC\n");
-    return BPF_OK;
+    return BPF_DROP;
 }
 
 char LICENSE[] SEC("license") = "GPL";
