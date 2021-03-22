@@ -109,7 +109,7 @@ int send_raw_socket(const struct repairSymbol_t *repairSymbol, char *srcaddr, ch
     bcopy(&src.sin6_addr, &(iphdr->ip6_src), 16);
 
 	/* IPv6 Destination address */
-    memset(&src, 0, sizeof(dst));
+    memset(&dst, 0, sizeof(dst));
 	dst.sin6_family = AF_INET6;
 	if (inet_pton(AF_INET6, dstaddr, dst.sin6_addr.s6_addr) != 1) {
 		perror("inet_ntop dst");
@@ -287,7 +287,7 @@ int main(int argc, char **argv) {
     sfd = socket(AF_INET6, SOCK_RAW, IPPROTO_RAW);
 	if (sfd == -1) {
 		perror("Cannot create socket");
-		return -1;
+		goto cleanup;
 	}
 
     /*int optval;
@@ -303,8 +303,8 @@ int main(int argc, char **argv) {
 
     /* Close socket */
     if (close(sfd) == -1) {
-		perror("Cannot close socket\n");
-		return -1;
+		perror("Cannot close socket");
+		goto cleanup;
 	}
 
 
