@@ -144,6 +144,7 @@ int send_raw_socket(const struct repairSymbol_t *repairSymbol) {
 
     /* Send packet */
     bytes = sendto(sfd, packet, packet_length, 0, (struct sockaddr *)&dst, sizeof(dst));
+    ++total;
     if (bytes != packet_length) {
         perror("Impossible to send packet");
         return -1;
@@ -187,7 +188,6 @@ static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz)
     //printf("CALL TRIGGERED!\n");
 
     send_raw_socket(repairSymbol);
-    ++total;
 }
 
 static void handle_events(int map_fd_events) {
@@ -220,7 +220,7 @@ static void handle_events(int map_fd_events) {
         ++total;
     }
 
-    printf("Total number of calls: %lu\n", total);
+    printf("Total number of calls: %llu\n", total);
 
 cleanup:
     perf_buffer__free(pb);
