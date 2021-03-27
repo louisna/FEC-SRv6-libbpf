@@ -34,6 +34,9 @@ struct repairSymbol_t {
 static volatile int sfd = -1;
 static volatile int first_sfd = 1;
 
+static struct sockaddr_in6 src;
+static struct sockaddr_in6 dst;
+
 /* From https://github.com/gih900/IPv6--DNS-Frag-Test-Rig/blob/master/dns-server-frag.c */
 uint16_t udp_checksum(const void *buff, size_t len, struct in6_addr *src_addr, struct in6_addr *dest_addr) {
     const uint16_t *buf = buff;
@@ -72,9 +75,7 @@ uint16_t udp_checksum(const void *buff, size_t len, struct in6_addr *src_addr, s
     return((uint16_t)(~sum));
 }
 
-int send_raw_socket(const struct repairSymbol_t *repairSymbol, char *srcaddr, char *dstaddr) {
-    struct sockaddr_in6 src;
-    struct sockaddr_in6 dst;
+int send_raw_socket(const struct repairSymbol_t *repairSymbol) {
     uint8_t packet[4200];
     size_t packet_length;
     struct ip6_hdr *iphdr;
@@ -100,21 +101,9 @@ int send_raw_socket(const struct repairSymbol_t *repairSymbol, char *srcaddr, ch
     iphdr->ip6_plen = 0; // Changed later
 
     /* IPv6 Source address */
-    memset(&src, 0, sizeof(src));
-    src.sin6_family = AF_INET6;
-    if (inet_pton(AF_INET6, srcaddr, src.sin6_addr.s6_addr) != 1) {
-        perror("inet ntop src");
-        return -1;
-    }
     bcopy(&src.sin6_addr, &(iphdr->ip6_src), 16);
 
 	/* IPv6 Destination address */
-    memset(&dst, 0, sizeof(dst));
-	dst.sin6_family = AF_INET6;
-	if (inet_pton(AF_INET6, dstaddr, dst.sin6_addr.s6_addr) != 1) {
-		perror("inet_ntop dst");
-		return -1;
-	}
 	bcopy(&dst.sin6_addr, &(iphdr->ip6_dst), 16);
 
     /* Segment Routing header */
@@ -195,7 +184,7 @@ static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz)
     const struct repairSymbol_t *repairSymbol = (struct repairSymbol_t *)data;
     printf("CALL TRIGGERED!\n");
 
-    send_raw_socket(repairSymbol, "fc00::a", "fc00::9");
+    send_raw_socket(repairSymbol);
 }
 
 static void handle_events(int map_fd_events) {
@@ -230,9 +219,30 @@ cleanup:
     perf_buffer__free(pb);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char *argv[]) {
     struct simple_lwt_seg6local_bpf *skel;
     int err;
+
+    if (argc != 3) {
+        fprintf(stderr, "Usage: ./simple_lwt_seg6local <encoder_addr> <decoder_addr>");
+        return -1;
+    }
+
+    /* IPv6 Source address */
+    memset(&src, 0, sizeof(src));
+    src.sin6_family = AF_INET6;
+    if (inet_pton(AF_INET6, argv[1], src.sin6_addr.s6_addr) != 1) {
+        perror("inet ntop src");
+        return -1;
+    }
+
+    /* IPv6 Destination address */
+    memset(&dst, 0, sizeof(dst));
+	dst.sin6_family = AF_INET6;
+	if (inet_pton(AF_INET6, argv[2], dst.sin6_addr.s6_addr) != 1) {
+		perror("inet_ntop dst");
+		return -1;
+	}
 
     /* Set up libbpf errors and debug info callback */
     libbpf_set_print(libbpf_print_fn);

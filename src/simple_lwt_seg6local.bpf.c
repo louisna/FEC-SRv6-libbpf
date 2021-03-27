@@ -109,7 +109,7 @@ static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymb
         return -1;
     }
 
-    bpf_printk("Sender: Done storing of packet with bigger size ! %d\n", packet_len);
+    if (DEBUG) bpf_printk("Sender: Done storing of packet with bigger size ! %d\n", packet_len);
     
     /* Store the length of the packet that will be XORed */
     sourceSymbol->packet_length = packet_len;
@@ -262,7 +262,7 @@ static __always_inline int fecFramework(struct __sk_buff *skb, struct coding_sou
 SEC("lwt_seg6local")
 int notify_ok(struct __sk_buff *skb)
 {
-    bpf_printk("BPF triggered from packet with SRv6 !\n");
+    if (DEBUG) bpf_printk("BPF triggered from packet with SRv6 !\n");
 
     int err;
     int k = 0;  // Key for hashmap
@@ -292,7 +292,7 @@ int notify_ok(struct __sk_buff *skb)
 
         /* Submit repair symbol(s) to User Space using perf events */
         bpf_perf_event_output(skb, &events, BPF_F_CURRENT_CPU, repairSymbol, sizeof(struct repairSymbol_t));
-        bpf_printk("Sent bpf event event to user space\n");
+        if (DEBUG) bpf_printk("Sent bpf event event to user space\n");
     }
 
     /* Add the TLV to the current source symbol and forward */

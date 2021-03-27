@@ -11,7 +11,6 @@
 #include "fec_srv6.h"
 #include "libseg6_decoder.c"
 
-#define DEBUG 1
 #define BPF_ERROR BPF_DROP  // Choose action when an error occurs in the process
 
 #define MAX_BLOCK 5  // Number of blocks we can simultaneously store
@@ -138,7 +137,7 @@ static __always_inline int decodingSourceXOR_on_the_line(struct __sk_buff *skb, 
         return -1;
     }
 
-    bpf_printk("Receiver: Done storing of packet with bigger size ! %d\n", packet_len);
+    if (DEBUG) bpf_printk("Receiver: Done storing of packet with bigger size ! %d\n", packet_len);
 
     /* Store the length of the packet that will be de-XORed */
     sourceSymbol->packet_length = packet_len;
@@ -297,7 +296,7 @@ static __always_inline unsigned short fecFrameworkSource(struct __sk_buff *skb, 
     /* Get information about this block number and update the structure */
     struct sourceBlock_t *sourceBlock = bpf_map_lookup_elem(&blockBuffer, &k_block);
     if (!sourceBlock) {
-        bpf_printk("Receiver: impossible to get a pointer to the source block (source framework)\n");
+        if (DEBUG) bpf_printk("Receiver: impossible to get a pointer to the source block (source framework)\n");
         return -1;
     }
 
@@ -340,7 +339,7 @@ static __always_inline unsigned short fecFrameworkRepair(struct __sk_buff *skb, 
     int err;
     int k0 = 0;
 
-    bpf_printk("Receiver: TRIGGERED FROM REPAIR SYMBOL\n");
+    if (DEBUG) bpf_printk("Receiver: TRIGGERED FROM REPAIR SYMBOL\n");
 
     /* Here must first load the repair TLV to know the source block, to load the good repair pointer */
     struct coding_repair2_t tlv;
@@ -357,7 +356,7 @@ static __always_inline unsigned short fecFrameworkRepair(struct __sk_buff *skb, 
     /* Get information about this block number and update the structure */
     struct sourceBlock_t *sourceBlock = bpf_map_lookup_elem(&blockBuffer, &k_block);
     if (!sourceBlock) {
-        bpf_printk("Receiver: impossible to get a pointer to the source block (repair framework)\n");
+        if (DEBUG) bpf_printk("Receiver: impossible to get a pointer to the source block (repair framework)\n");
         return -1;
     }
 
@@ -406,7 +405,7 @@ static __always_inline int canDecodeXOR(unsigned short blockID) {
      * TODO: if we disable the tracing, we can make only one if condition
      */
     int total_loss = sourceBlock->nss - sourceBlock->receivedSource;
-    bpf_printk("Receiver: receivedSource: %d and nss: %d\n", sourceBlock->receivedSource, sourceBlock->nss);
+    if (DEBUG) bpf_printk("Receiver: receivedSource: %d and nss: %d\n", sourceBlock->receivedSource, sourceBlock->nss);
     if (total_loss == 0) {
         if (DEBUG) bpf_printk("Receiver: no loss, no need for recovery\n");
         return 0;
@@ -475,7 +474,7 @@ int decode(struct __sk_buff *skb) {
 
         /* Submit repair symbol(s) to User Space using perf events */
         bpf_perf_event_output(skb, &events, BPF_F_CURRENT_CPU, repairSymbol, sizeof(struct repairSymbol_t));
-        bpf_printk("Receiver: sent bpf event to user space");
+        if (DEBUG) bpf_printk("Receiver: sent bpf event to user space");
     }
 
     /* The repair symbol(s) must be dropped because not useful for the rest of the network */
