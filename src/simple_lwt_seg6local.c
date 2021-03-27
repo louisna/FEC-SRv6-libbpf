@@ -175,6 +175,8 @@ static void bump_memlock_rlimit(void) {
 	}
 }
 
+static uint64_t total = 0;
+
 static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz) {
     /* Get the repairSymbol
      * ->packet: the repair symbol
@@ -185,6 +187,7 @@ static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz)
     //printf("CALL TRIGGERED!\n");
 
     send_raw_socket(repairSymbol);
+    ++total;
 }
 
 static void handle_events(int map_fd_events) {
@@ -203,7 +206,6 @@ static void handle_events(int map_fd_events) {
         goto cleanup;
     }
 
-    uint64_t total = 0;
 
     /* Enter in loop until a signal is retrieved
      * Poll the notification from the BPF program means that we can
