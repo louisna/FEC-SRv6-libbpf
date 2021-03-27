@@ -33,6 +33,7 @@ struct repairSymbol_t {
 
 static volatile int sfd = -1;
 static volatile int first_sfd = 1;
+static uint64_t total = 0;
 
 static struct sockaddr_in6 src;
 static struct sockaddr_in6 dst;
@@ -176,8 +177,6 @@ static void bump_memlock_rlimit(void) {
 	}
 }
 
-static uint64_t total = 0;
-
 static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz) {
     /* Get the repairSymbol
      * ->packet: the repair symbol
@@ -220,7 +219,7 @@ static void handle_events(int map_fd_events) {
         ++total;
     }
 
-    printf("Total number of calls: %llu\n", total);
+    printf("Total number of calls: %lu\n", total);
 
 cleanup:
     perf_buffer__free(pb);
