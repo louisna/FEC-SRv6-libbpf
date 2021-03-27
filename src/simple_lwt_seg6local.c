@@ -187,7 +187,7 @@ static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz)
     //printf("CALL TRIGGERED!\n");
 
     ++total;
-    //send_raw_socket(repairSymbol);
+    send_raw_socket(repairSymbol);
 }
 
 static void handle_events(int map_fd_events) {
