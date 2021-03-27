@@ -11,7 +11,7 @@
 #include "fec_srv6.h"
 #include "libseg6.c"
 
-#define DEBUG 1
+#define DEBUG 0
 #define BPF_ERROR BPF_DROP  // Choose action when an error occurs in the process
 
 /* Structures */
@@ -57,7 +57,7 @@ struct {
 
 static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymbol_t *repairSymbol)
 {
-    if (DEBUG) bpf_printk("Sender: call doXOR\n");
+    //if (DEBUG) bpf_printk("Sender: call doXOR\n");
 
     void *data = (void *)(long)skb->data;
     void *data_end = (void *)(long)skb->data_end;
@@ -67,27 +67,27 @@ static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymb
     /* Get pointer to the IPv6 header of the packet, i.e. the beginning of the source symbol */
     struct ip6_t *ip6 = seg6_get_ipv6(skb);
     if (!ip6) {
-        if (DEBUG) bpf_printk("Sender: impossible to get the IPv6 header\n");
+        //if (DEBUG) bpf_printk("Sender: impossible to get the IPv6 header\n");
         return -1;
     }
 
     /* Get the packet length from the IPv6 header to the end of the payload */
     unsigned int packet_len = ((long)data_end) - ((long)(void *)ip6);
     if ((void *)ip6 + packet_len > data_end) {
-        if (DEBUG) bpf_printk("Sender: inconsistent payload length\n");
+        //if (DEBUG) bpf_printk("Sender: inconsistent payload length\n");
         return -1;
     }
 
     /* Ensures that we do not try to protect a too big packet */
     if (packet_len > MAX_PACKET_SIZE) {
-        if (DEBUG) bpf_printk("Sender: too big packet, does not protect\n");
+        //if (DEBUG) bpf_printk("Sender: too big packet, does not protect\n");
         return 1;
     }
 
     /* Get the source symbol from the buffer to store a copy of the packet */
     struct sourceSymbol_t *sourceSymbol = bpf_map_lookup_elem(&sourceSymbolBuffer, &k);
     if (!sourceSymbol) {
-        if (DEBUG) bpf_printk("Sender: impossible to get a pointer to store the source symbol\n");
+        //if (DEBUG) bpf_printk("Sender: impossible to get a pointer to store the source symbol\n");
         return -1;
     }
     memset(sourceSymbol, 0, sizeof(struct sourceSymbol_t)); // Clean the source symbol from previous packet
@@ -101,15 +101,15 @@ static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymb
         // TODO: 0xffff should be set as global => ensures that the size is the max classic size of IPv6 packt
         err = bpf_skb_load_bytes(skb, ipv6_offset, (void *)sourceSymbol->packet, (size & 0xffff) + 1);
     } else {
-        if (DEBUG) bpf_printk("Sender: Wrong ipv6_offset\n");
+        //if (DEBUG) bpf_printk("Sender: Wrong ipv6_offset\n");
         return -1;
     }
     if (err < 0) {
-        if (DEBUG) bpf_printk("Sender: impossible to load bytes from packet\n");
+        //if (DEBUG) bpf_printk("Sender: impossible to load bytes from packet\n");
         return -1;
     }
 
-    if (DEBUG) bpf_printk("Sender: Done storing of packet with bigger size ! %d\n", packet_len);
+    //if (DEBUG) bpf_printk("Sender: Done storing of packet with bigger size ! %d\n", packet_len);
     
     /* Store the length of the packet that will be XORed */
     sourceSymbol->packet_length = packet_len;
@@ -135,7 +135,7 @@ static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymb
      * as it will also be modified for the decoder
      */
     if (40 + sizeof(struct ip6_srh_t) > sizeof(sourceSymbol->packet)) {
-        if (DEBUG) bpf_printk("Sender: cannot get the SRH from the sourceSymbol\n");
+        //if (DEBUG) bpf_printk("Sender: cannot get the SRH from the sourceSymbol\n");
         return -1;
     }
     struct ip6_srh_t *srh = (struct ip6_srh_t *)(sourceSymbol->packet + 40);
@@ -153,7 +153,7 @@ static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymb
     struct coding_repair2_t *repair_tlv = (struct coding_repair2_t *)&(repairSymbol->tlv);
     repair_tlv->payload_len = repair_tlv->payload_len ^ sourceSymbol->packet_length;
 
-    if (DEBUG) bpf_printk("Sender: coded on the line a packet\n");
+    //if (DEBUG) bpf_printk("Sender: coded on the line a packet\n");
 
     return 0;
 }
@@ -166,7 +166,7 @@ static __always_inline int codingXOR_on_the_line(struct __sk_buff *skb, unsigned
     /* Load the unique repair symbol pointer from map */
     struct repairSymbol_t *repairSymbol = bpf_map_lookup_elem(&repairSymbolBuffer, &k0);
     if (!repairSymbol) {
-        if (DEBUG) bpf_printk("Sender: impossible to get pointer to repairSymbol pointer\n");
+        //if (DEBUG) bpf_printk("Sender: impossible to get pointer to repairSymbol pointer\n");
         return -1;
     }
 
@@ -178,10 +178,10 @@ static __always_inline int codingXOR_on_the_line(struct __sk_buff *skb, unsigned
     /* Do the XOR on the packet starting from the IPv6 header */
     err = loadAndDoXOR(skb, repairSymbol);
     if (err < 0) {
-        if (DEBUG) bpf_printk("Sender: codingXOR error confirmed\n");
+        //if (DEBUG) bpf_printk("Sender: codingXOR error confirmed\n");
         return -1;
     } else if (err == 1) { // Cannot protect the packet because too big size
-        if (DEBUG) bpf_printk("Sender: too big packet confirmed\n");
+        //if (DEBUG) bpf_printk("Sender: too big packet confirmed\n");
         return 2;
     }
 
@@ -237,10 +237,10 @@ static __always_inline int fecFramework(struct __sk_buff *skb, struct coding_sou
      */
     err = codingXOR_on_the_line(skb, sourceBlock, sourceSymbolCount);
     if (err < 0) { // Error
-        if (DEBUG) bpf_printk("Sender fewFramework: error confirmed\n");
+        //if (DEBUG) bpf_printk("Sender fewFramework: error confirmed\n");
         return -1;
     } else if (err == 2) {
-        if (DEBUG) bpf_printk("Sender: too big packet confirmed 2\n");
+        //if (DEBUG) bpf_printk("Sender: too big packet confirmed 2\n");
         return -1;
     }
     
@@ -262,7 +262,7 @@ static __always_inline int fecFramework(struct __sk_buff *skb, struct coding_sou
 SEC("lwt_seg6local")
 int notify_ok(struct __sk_buff *skb)
 {
-    if (DEBUG) bpf_printk("BPF triggered from packet with SRv6 !\n");
+    //if (DEBUG) bpf_printk("BPF triggered from packet with SRv6 !\n");
 
     int err;
     int k = 0;  // Key for hashmap
@@ -270,7 +270,7 @@ int notify_ok(struct __sk_buff *skb)
     /* Get Segment Routing Header */
     struct ip6_srh_t *srh = seg6_get_srh(skb);
     if (!srh) {
-        if (DEBUG) bpf_printk("Sender: impossible to get the SRH\n");
+        //if (DEBUG) bpf_printk("Sender: impossible to get the SRH\n");
         return BPF_ERROR;
     }
 
@@ -278,7 +278,7 @@ int notify_ok(struct __sk_buff *skb)
     struct coding_source_t tlv;
     err = fecFramework(skb, &tlv);
     if (err < 0) {
-        if (DEBUG) bpf_printk("Sender: Error in FEC Framework\n");
+        //if (DEBUG) bpf_printk("Sender: Error in FEC Framework\n");
         return BPF_ERROR;
     }
 
@@ -286,19 +286,19 @@ int notify_ok(struct __sk_buff *skb)
     if (err == 1) { // The folloing is very specific to the XOR coding function
         struct repairSymbol_t *repairSymbol = bpf_map_lookup_elem(&repairSymbolBuffer, &k);
         if (!repairSymbol) {
-            if (DEBUG) bpf_printk("Sender: impossible to get full repair symbol from buffer\n");
+            //if (DEBUG) bpf_printk("Sender: impossible to get full repair symbol from buffer\n");
             return BPF_ERROR;
         }
 
         /* Submit repair symbol(s) to User Space using perf events */
         bpf_perf_event_output(skb, &events, BPF_F_CURRENT_CPU, repairSymbol, sizeof(struct repairSymbol_t));
-        if (DEBUG) bpf_printk("Sent bpf event event to user space\n");
+        //if (DEBUG) bpf_printk("Sent bpf event event to user space\n");
     }
 
     /* Add the TLV to the current source symbol and forward */
     unsigned short tlv_length = sizeof(struct coding_source_t);
     err = seg6_add_tlv(skb, srh, (srh->hdrlen + 1) << 3, (struct sr6_tlv_t *)&tlv, tlv_length);
-    if (DEBUG) bpf_printk("Sender: return value of TLV add: %d\n", err);
+    //if (DEBUG) bpf_printk("Sender: return value of TLV add: %d\n", err);
     return (err) ? BPF_ERROR : BPF_OK;
 }
 

@@ -182,7 +182,7 @@ static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz)
      * ->tlv: the TLV to be added in the SRH header 
      */
     const struct repairSymbol_t *repairSymbol = (struct repairSymbol_t *)data;
-    printf("CALL TRIGGERED!\n");
+    //printf("CALL TRIGGERED!\n");
 
     send_raw_socket(repairSymbol);
 }
@@ -203,6 +203,8 @@ static void handle_events(int map_fd_events) {
         goto cleanup;
     }
 
+    uint64_t total = 0;
+
     /* Enter in loop until a signal is retrieved
      * Poll the notification from the BPF program means that we can
      * retrieve information from a repairSymbol_t and send it to the decoder router
@@ -213,7 +215,10 @@ static void handle_events(int map_fd_events) {
             fprintf(stderr, "Error polling perf buffer: %d\n", err);
             goto cleanup;
         }
+        ++total;
     }
+
+    printf("Total number of calls: %lu\n", total);
 
 cleanup:
     perf_buffer__free(pb);
