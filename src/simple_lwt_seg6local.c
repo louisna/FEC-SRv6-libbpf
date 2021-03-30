@@ -184,31 +184,28 @@ static void bump_memlock_rlimit(void) {
 	}
 }
 
-static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz) {
+static int send_repairSymbol_XOR(void *ctx, void *data, size_t data_sz) {
     /* Get the repairSymbol
      * ->packet: the repair symbol
      * ->packet_length: the length of the repair symbol
      * ->tlv: the TLV to be added in the SRH header 
      */
     const struct repairSymbol_t *repairSymbol = (struct repairSymbol_t *)data;
-    //printf("CALL TRIGGERED!\n");
+    printf("CALL TRIGGERED!\n");
 
     ++total;
+    return 0;
     //send_raw_socket(repairSymbol);
 }
 
 static void handle_events(int map_fd_events) {
     /* Define structure for the perf event */
-    struct perf_buffer_opts pb_opts = {
-        .sample_cb = send_repairSymbol_XOR,
-    };
-    struct perf_buffer *pb = NULL;
+    struct ring_buffer *rb = NULL;
     int err;
 
-    pb = perf_buffer__new(map_fd_events, 128, &pb_opts);
-    err = libbpf_get_error(pb);
-    if (err) {
-        pb = NULL;
+    rb = ring_buffer__new(map_fd_events, send_repairSymbol_XOR, NULL, NULL);
+    if (!rb) {
+        rb = NULL;
         fprintf(stderr, "Impossible to open perf event\n");
         goto cleanup;
     }
@@ -219,7 +216,7 @@ static void handle_events(int map_fd_events) {
      * retrieve information from a repairSymbol_t and send it to the decoder router
      */
     while (!exiting) {
-        err = perf_buffer__poll(pb, 100);
+        err = ring_buffer__poll(rb, 100);
         if (err < 0 && errno != EINTR) {
             fprintf(stderr, "Error polling perf buffer: %d\n", err);
             goto cleanup;
@@ -229,7 +226,7 @@ static void handle_events(int map_fd_events) {
     printf("Total number of calls: %lu\n", total);
 
 cleanup:
-    perf_buffer__free(pb);
+    ring_buffer__free(rb);
 }
 
 int main(int argc, char *argv[]) {
@@ -314,7 +311,7 @@ int main(int argc, char *argv[]) {
     }*/
 
     /* Enter perf event handling for packet recovering */
-    //handle_events(map_fd_events);
+    handle_events(map_fd_events);
 
     /* Close socket */
     if (close(sfd) == -1) {

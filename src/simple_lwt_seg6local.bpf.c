@@ -44,7 +44,7 @@ struct {
 /* Perf even buffer */
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
-    __uint(max_entries, 4096 * 32);
+    __uint(max_entries, 4096 * 512);
 } events SEC(".maps");
 
 static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymbol_t *repairSymbol, mapStruct_t *mapStruct)
@@ -271,12 +271,8 @@ int notify_ok(struct __sk_buff *skb)
         struct repairSymbol_t *repairSymbol = &(mapStruct->repairSymbol);
 
         /* Submit repair symbol(s) to User Space using perf events */
-        struct repairSymbol_t *tmp = bpf_ringbuf_reserve(&events, sizeof(struct repairSymbol_t), 0);
-        if (!tmp) {
-            if (DEBUG) bpf_printk("Sender: impossible to send to user space\n");
-            return BPF_OK;
-        }
-        bpf_ringbuf_submit(repairSymbol, 0);
+        
+        bpf_ringbuf_output(&events, repairSymbol, sizeof(struct repairSymbol_t), 0);
         if (DEBUG) bpf_printk("Sent bpf event event to user space\n");
     }
 
