@@ -191,7 +191,7 @@ static int send_repairSymbol_XOR(void *ctx, void *data, size_t data_sz) {
      * ->tlv: the TLV to be added in the SRH header 
      */
     const struct repairSymbol_t *repairSymbol = (struct repairSymbol_t *)data;
-    printf("CALL TRIGGERED!\n");
+    //printf("CALL TRIGGERED!\n");
 
     ++total;
     return 0;
