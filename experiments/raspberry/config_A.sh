@@ -1,14 +1,17 @@
 #!/bin/bash
 
-sysctl -w net.core.rmem_default=524287
-sysctl -w net.core.wmem_default=524287
-sysctl -w net.core.rmem_max=524287
-sysctl -w net.core.wmem_max=524287
-sysctl -w net.core.optmem_max=524287
+sysctl -w net.core.rmem_default=2621440
+sysctl -w net.core.wmem_default=2621440
+sysctl -w net.core.rmem_max=2621440
+sysctl -w net.core.wmem_max=2621440
+sysctl -w net.core.optmem_max=2621440
 sysctl -w net.core.netdev_max_backlog=300000
 sysctl -w net.ipv4.tcp_rmem="10000000 10000000 10000000"
 sysctl -w net.ipv4.tcp_wmem="10000000 10000000 10000000"
 sysctl -w net.ipv4.tcp_mem="10000000 10000000 10000000"
+sysctl -w net.ipv4.udp_rmem="10000000 10000000 10000000"
+sysctl -w net.ipv4.udp_wmem="10000000 10000000 10000000"
+sysctl -w net.ipv4.udp_mem="10000000 10000000 10000000"
 sysctl net.ipv6.conf.all.forwarding=1
 sysctl net.ipv6.conf.all.seg6_enabled=1
 sysctl net.ipv6.conf.eth0.seg6_enabled=1

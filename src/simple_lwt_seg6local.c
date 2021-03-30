@@ -40,6 +40,7 @@ typedef struct mapStruct {
 
 static volatile int sfd = -1;
 static volatile int first_sfd = 1;
+static uint64_t total = 0;
 
 static struct sockaddr_in6 src;
 static struct sockaddr_in6 dst;
@@ -151,6 +152,7 @@ int send_raw_socket(const struct repairSymbol_t *repairSymbol) {
 
     /* Send packet */
     bytes = sendto(sfd, packet, packet_length, 0, (struct sockaddr *)&dst, sizeof(dst));
+    //++total;
     if (bytes != packet_length) {
         perror("Impossible to send packet");
         return -1;
@@ -189,9 +191,10 @@ static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz)
      * ->tlv: the TLV to be added in the SRH header 
      */
     const struct repairSymbol_t *repairSymbol = (struct repairSymbol_t *)data;
-    printf("CALL TRIGGERED!\n");
+    //printf("CALL TRIGGERED!\n");
 
-    send_raw_socket(repairSymbol);
+    ++total;
+    //send_raw_socket(repairSymbol);
 }
 
 static void handle_events(int map_fd_events) {
@@ -210,6 +213,7 @@ static void handle_events(int map_fd_events) {
         goto cleanup;
     }
 
+
     /* Enter in loop until a signal is retrieved
      * Poll the notification from the BPF program means that we can
      * retrieve information from a repairSymbol_t and send it to the decoder router
@@ -221,6 +225,8 @@ static void handle_events(int map_fd_events) {
             goto cleanup;
         }
     }
+
+    printf("Total number of calls: %lu\n", total);
 
 cleanup:
     perf_buffer__free(pb);
