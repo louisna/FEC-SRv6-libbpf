@@ -26,27 +26,20 @@ struct repairSymbol_t {
     unsigned char tlv[sizeof(struct coding_repair2_t)];
 };
 
-/* Maps */
-struct {
-	__uint(type, BPF_MAP_TYPE_HASH);
-	__uint(max_entries, 2);
-	__type(key, unsigned int);
-	__type(value, unsigned short);
-} indexTable SEC(".maps");
+typedef struct mapStruct {
+    unsigned short soubleBlock;
+    unsigned short sourceSymbolCount;
+    struct sourceSymbol_t sourceSymbol;
+    struct repairSymbol_t repairSymbol;
+} mapStruct_t;
 
+/* Map */
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 1);
     __type(key, unsigned int);
-    __type(value, struct sourceSymbol_t);
-} sourceSymbolBuffer SEC(".maps");
-
-struct {
-    __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(max_entries, 1);
-    __type(key, unsigned int);
-    __type(value, struct repairSymbol_t);
-} repairSymbolBuffer SEC(".maps");
+    __type(value, mapStruct_t);
+} fecBuffer SEC(".maps");
 
 /* Perf even buffer */
 struct {
@@ -55,7 +48,7 @@ struct {
     __uint(value_size, sizeof(unsigned int));
 } events SEC(".maps");
 
-static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymbol_t *repairSymbol)
+static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymbol_t *repairSymbol, mapStruct_t *mapStruct)
 {
     //if (DEBUG) bpf_printk("Sender: call doXOR\n");
 
@@ -85,11 +78,7 @@ static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymb
     }
 
     /* Get the source symbol from the buffer to store a copy of the packet */
-    struct sourceSymbol_t *sourceSymbol = bpf_map_lookup_elem(&sourceSymbolBuffer, &k);
-    if (!sourceSymbol) {
-        //if (DEBUG) bpf_printk("Sender: impossible to get a pointer to store the source symbol\n");
-        return -1;
-    }
+    struct sourceSymbol_t *sourceSymbol = &mapStruct->sourceSymbol;
     memset(sourceSymbol, 0, sizeof(struct sourceSymbol_t)); // Clean the source symbol from previous packet
 
     unsigned int ipv6_offset = (long)ip6 - (long)data;
@@ -145,6 +134,8 @@ static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymb
     unsigned long *source_long = (unsigned long *)sourceSymbol->packet;
     unsigned long *repair_long = (unsigned long *)repairSymbol->packet;
     int j;
+
+    #pragma clang loop unroll(full)
     for (j = 0; j < MAX_PACKET_SIZE / sizeof(unsigned long); ++j) {
         repair_long[j] = repair_long[j] ^ source_long[j];
     }
@@ -158,17 +149,16 @@ static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymb
     return 0;
 }
 
-static __always_inline int codingXOR_on_the_line(struct __sk_buff *skb, unsigned short sourceBlock, unsigned short sourceSymbolCount) 
+static __always_inline int codingXOR_on_the_line(struct __sk_buff *skb, mapStruct_t *mapStruct) 
 {
     int err;
     int k0 = 0;
 
+    unsigned short sourceBlock = mapStruct->soubleBlock; 
+    unsigned short sourceSymbolCount = mapStruct->sourceSymbolCount;
+
     /* Load the unique repair symbol pointer from map */
-    struct repairSymbol_t *repairSymbol = bpf_map_lookup_elem(&repairSymbolBuffer, &k0);
-    if (!repairSymbol) {
-        //if (DEBUG) bpf_printk("Sender: impossible to get pointer to repairSymbol pointer\n");
-        return -1;
-    }
+    struct repairSymbol_t *repairSymbol = &mapStruct->repairSymbol;
 
     /* Reset the repair symbol from previous block if this is new block */
     if (sourceSymbolCount == 0) {
@@ -176,7 +166,7 @@ static __always_inline int codingXOR_on_the_line(struct __sk_buff *skb, unsigned
     }
 
     /* Do the XOR on the packet starting from the IPv6 header */
-    err = loadAndDoXOR(skb, repairSymbol);
+    err = loadAndDoXOR(skb, repairSymbol, mapStruct);
     if (err < 0) {
         //if (DEBUG) bpf_printk("Sender: codingXOR error confirmed\n");
         return -1;
@@ -202,23 +192,11 @@ static __always_inline int codingXOR_on_the_line(struct __sk_buff *skb, unsigned
     return 0;
 }
  
-static __always_inline int fecFramework(struct __sk_buff *skb, struct coding_source_t *csh)
+static __always_inline int fecFramework(struct __sk_buff *skb, struct coding_source_t *csh, mapStruct_t *mapStruct)
 {
     int err;
-    int k0 = 0; int k1 = 1;
-    unsigned short *sourceBlock_p       = bpf_map_lookup_elem(&indexTable, &k0);
-    unsigned short *sourceSymbolCount_p = bpf_map_lookup_elem(&indexTable, &k1);
-    unsigned short sourceBlock; unsigned short sourceSymbolCount;
-
-    /* Get current values of source block */
-    if (!sourceBlock_p)
-        sourceBlock = 0;
-    else
-        sourceBlock = *sourceBlock_p;
-    if (!sourceSymbolCount_p)
-        sourceSymbolCount = 0;
-    else
-        sourceSymbolCount = *sourceSymbolCount_p;
+    unsigned short sourceBlock = mapStruct->soubleBlock; 
+    unsigned short sourceSymbolCount = mapStruct->sourceSymbolCount;
     
     /* Complete the source symbol TLV */
     memset(csh, 0, sizeof(struct coding_source_t));
@@ -235,7 +213,7 @@ static __always_inline int fecFramework(struct __sk_buff *skb, struct coding_sou
      *             2 if the packet cannot be protected,
      *             0 otherwise
      */
-    err = codingXOR_on_the_line(skb, sourceBlock, sourceSymbolCount);
+    err = codingXOR_on_the_line(skb, mapStruct);
     if (err < 0) { // Error
         //if (DEBUG) bpf_printk("Sender fewFramework: error confirmed\n");
         return -1;
@@ -252,9 +230,9 @@ static __always_inline int fecFramework(struct __sk_buff *skb, struct coding_sou
         ++sourceSymbolCount;
     }
 
-    /* Update map with new values */
-    bpf_map_update_elem(&indexTable, &k0, &sourceBlock, BPF_ANY);
-    bpf_map_update_elem(&indexTable, &k1, &sourceSymbolCount, BPF_ANY);
+    /* Update with new values */
+    mapStruct->soubleBlock = sourceBlock;
+    mapStruct->sourceSymbolCount = sourceSymbolCount;
 
     return err;
 }
@@ -274,9 +252,16 @@ int notify_ok(struct __sk_buff *skb)
         return BPF_ERROR;
     }
 
+    /* Get pointer to structure of the plugin */
+    mapStruct_t *mapStruct = bpf_map_lookup_elem(&fecBuffer, &k);
+    if (!mapStruct) {
+        if (DEBUG) bpf_printk("Sender: impossible to get global pointer\n");
+        return BPF_ERROR;
+    }
+
     /* Create TLV structure and call FEC Framework */
     struct coding_source_t tlv;
-    err = fecFramework(skb, &tlv);
+    err = fecFramework(skb, &tlv, mapStruct);
     if (err < 0) {
         //if (DEBUG) bpf_printk("Sender: Error in FEC Framework\n");
         return BPF_ERROR;
@@ -284,11 +269,7 @@ int notify_ok(struct __sk_buff *skb)
 
     /* Send repair symbol(s) */
     if (err == 1) { // The folloing is very specific to the XOR coding function
-        struct repairSymbol_t *repairSymbol = bpf_map_lookup_elem(&repairSymbolBuffer, &k);
-        if (!repairSymbol) {
-            //if (DEBUG) bpf_printk("Sender: impossible to get full repair symbol from buffer\n");
-            return BPF_ERROR;
-        }
+        struct repairSymbol_t *repairSymbol = &(mapStruct->repairSymbol);
 
         /* Submit repair symbol(s) to User Space using perf events */
         bpf_perf_event_output(skb, &events, BPF_F_CURRENT_CPU, repairSymbol, sizeof(struct repairSymbol_t));
