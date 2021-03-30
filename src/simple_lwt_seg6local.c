@@ -31,6 +31,13 @@ struct repairSymbol_t {
     unsigned char tlv[sizeof(struct coding_repair2_t)];
 };
 
+typedef struct mapStruct {
+    unsigned short soubleBlock;
+    unsigned short sourceSymbolCount;
+    struct sourceSymbol_t sourceSymbol;
+    struct repairSymbol_t repairSymbol;
+} mapStruct_t;
+
 static volatile int sfd = -1;
 static volatile int first_sfd = 1;
 
@@ -277,18 +284,10 @@ int main(int argc, char *argv[]) {
     int k0 = 0;
 
     /* Get file descriptor of maps and init the value of the structures */
-    struct bpf_map *map_indexTable = skel->maps.indexTable;
-    int map_fd_indexTable = bpf_map__fd(map_indexTable);
-
-    struct bpf_map *map_sourceSymbolBuffer = skel->maps.sourceSymbolBuffer;
-    int map_fd_sourceSymbolBuffer = bpf_map__fd(map_sourceSymbolBuffer);
-    struct sourceSymbol_t source_zero = {};
-    bpf_map_update_elem(map_fd_sourceSymbolBuffer, &k0, &source_zero, BPF_ANY);
-
-    struct bpf_map *map_repairSymbolBuffer = skel->maps.repairSymbolBuffer;
-    int map_fd_repairSymbolBuffer = bpf_map__fd(map_repairSymbolBuffer);
-    struct repairSymbol_t repair_zero = {};
-    bpf_map_update_elem(map_fd_repairSymbolBuffer, &k0, &repair_zero, BPF_ANY);
+    struct bpf_map *map_fecBuffer = skel->maps.fecBuffer;
+    int map_fd_fecBuffer = bpf_map__fd(map_fecBuffer);
+    mapStruct_t struct_zero = {};
+    bpf_map_update_elem(map_fd_fecBuffer, &k0, &struct_zero, BPF_ANY);
 
     struct bpf_map *map_events = skel->maps.events;
     int map_fd_events = bpf_map__fd(map_events);
@@ -321,9 +320,7 @@ int main(int argc, char *argv[]) {
     // We reach this point when we Ctrl+C with signal handling
     /* Unpin the program and the maps to clean at exit */
     bpf_object__unpin_programs(skel->obj,  "/sys/fs/bpf/simple_me");
-    bpf_map__unpin(map_indexTable,         "/sys/fs/bpf/simple_me/indexTable");
-    bpf_map__unpin(map_sourceSymbolBuffer, "/sys/fs/bpf/simple_me/sourceSymbolBuffer");
-    bpf_map__unpin(map_repairSymbolBuffer, "/sys/fs/bpf/simple_me/repairSymbolBuffer");
+    bpf_map__unpin(map_fecBuffer, "/sys/fs/bpf/simple_me/fecBuffer");
     // Do not know if I have to unpin the perf event too
     bpf_map__unpin(map_events, "/sys/fs/bpf/simple_me/events");
     simple_lwt_seg6local_bpf__destroy(skel);
