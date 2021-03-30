@@ -31,8 +31,19 @@ struct repairSymbol_t {
     unsigned char tlv[sizeof(struct coding_repair2_t)];
 };
 
+typedef struct mapStruct {
+    unsigned short soubleBlock;
+    unsigned short sourceSymbolCount;
+    struct sourceSymbol_t sourceSymbol;
+    struct repairSymbol_t repairSymbol;
+} mapStruct_t;
+
 static volatile int sfd = -1;
-static volatile bool first_sfd = 1;
+static volatile int first_sfd = 1;
+static uint64_t total = 0;
+
+static struct sockaddr_in6 src;
+static struct sockaddr_in6 dst;
 
 /* From https://github.com/gih900/IPv6--DNS-Frag-Test-Rig/blob/master/dns-server-frag.c */
 uint16_t udp_checksum(const void *buff, size_t len, struct in6_addr *src_addr, struct in6_addr *dest_addr) {
@@ -72,9 +83,7 @@ uint16_t udp_checksum(const void *buff, size_t len, struct in6_addr *src_addr, s
     return((uint16_t)(~sum));
 }
 
-int send_raw_socket(const struct repairSymbol_t *repairSymbol, char *srcaddr, char *dstaddr) {
-    struct sockaddr_in6 src;
-    struct sockaddr_in6 dst;
+int send_raw_socket(const struct repairSymbol_t *repairSymbol) {
     uint8_t packet[4200];
     size_t packet_length;
     struct ip6_hdr *iphdr;
@@ -100,21 +109,9 @@ int send_raw_socket(const struct repairSymbol_t *repairSymbol, char *srcaddr, ch
     iphdr->ip6_plen = 0; // Changed later
 
     /* IPv6 Source address */
-    memset(&src, 0, sizeof(src));
-    src.sin6_family = AF_INET6;
-    if (inet_pton(AF_INET6, srcaddr, src.sin6_addr.s6_addr) != 1) {
-        perror("inet ntop src");
-        return -1;
-    }
     bcopy(&src.sin6_addr, &(iphdr->ip6_src), 16);
 
 	/* IPv6 Destination address */
-    memset(&src, 0, sizeof(dst));
-	dst.sin6_family = AF_INET6;
-	if (inet_pton(AF_INET6, dstaddr, dst.sin6_addr.s6_addr) != 1) {
-		perror("inet_ntop dst");
-		return -1;
-	}
 	bcopy(&dst.sin6_addr, &(iphdr->ip6_dst), 16);
 
     /* Segment Routing header */
@@ -155,6 +152,7 @@ int send_raw_socket(const struct repairSymbol_t *repairSymbol, char *srcaddr, ch
 
     /* Send packet */
     bytes = sendto(sfd, packet, packet_length, 0, (struct sockaddr *)&dst, sizeof(dst));
+    //++total;
     if (bytes != packet_length) {
         perror("Impossible to send packet");
         return -1;
@@ -193,9 +191,10 @@ static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz)
      * ->tlv: the TLV to be added in the SRH header 
      */
     const struct repairSymbol_t *repairSymbol = (struct repairSymbol_t *)data;
-    printf("CALL TRIGGERED!\n");
+    //printf("CALL TRIGGERED!\n");
 
-    send_raw_socket(repairSymbol, "fc00::a", "fc00::9");
+    ++total;
+    //send_raw_socket(repairSymbol);
 }
 
 static void handle_events(int map_fd_events) {
@@ -214,6 +213,7 @@ static void handle_events(int map_fd_events) {
         goto cleanup;
     }
 
+
     /* Enter in loop until a signal is retrieved
      * Poll the notification from the BPF program means that we can
      * retrieve information from a repairSymbol_t and send it to the decoder router
@@ -226,13 +226,36 @@ static void handle_events(int map_fd_events) {
         }
     }
 
+    printf("Total number of calls: %lu\n", total);
+
 cleanup:
     perf_buffer__free(pb);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char *argv[]) {
     struct simple_lwt_seg6local_bpf *skel;
     int err;
+
+    if (argc != 3) {
+        fprintf(stderr, "Usage: ./simple_lwt_seg6local <encoder_addr> <decoder_addr>");
+        return -1;
+    }
+
+    /* IPv6 Source address */
+    memset(&src, 0, sizeof(src));
+    src.sin6_family = AF_INET6;
+    if (inet_pton(AF_INET6, argv[1], src.sin6_addr.s6_addr) != 1) {
+        perror("inet ntop src");
+        return -1;
+    }
+
+    /* IPv6 Destination address */
+    memset(&dst, 0, sizeof(dst));
+	dst.sin6_family = AF_INET6;
+	if (inet_pton(AF_INET6, argv[2], dst.sin6_addr.s6_addr) != 1) {
+		perror("inet_ntop dst");
+		return -1;
+	}
 
     /* Set up libbpf errors and debug info callback */
     libbpf_set_print(libbpf_print_fn);
@@ -267,18 +290,10 @@ int main(int argc, char **argv) {
     int k0 = 0;
 
     /* Get file descriptor of maps and init the value of the structures */
-    struct bpf_map *map_indexTable = skel->maps.indexTable;
-    int map_fd_indexTable = bpf_map__fd(map_indexTable);
-
-    struct bpf_map *map_sourceSymbolBuffer = skel->maps.sourceSymbolBuffer;
-    int map_fd_sourceSymbolBuffer = bpf_map__fd(map_sourceSymbolBuffer);
-    struct sourceSymbol_t source_zero = {};
-    bpf_map_update_elem(map_fd_sourceSymbolBuffer, &k0, &source_zero, BPF_ANY);
-
-    struct bpf_map *map_repairSymbolBuffer = skel->maps.repairSymbolBuffer;
-    int map_fd_repairSymbolBuffer = bpf_map__fd(map_repairSymbolBuffer);
-    struct repairSymbol_t repair_zero = {};
-    bpf_map_update_elem(map_fd_repairSymbolBuffer, &k0, &repair_zero, BPF_ANY);
+    struct bpf_map *map_fecBuffer = skel->maps.fecBuffer;
+    int map_fd_fecBuffer = bpf_map__fd(map_fecBuffer);
+    mapStruct_t struct_zero = {};
+    bpf_map_update_elem(map_fd_fecBuffer, &k0, &struct_zero, BPF_ANY);
 
     struct bpf_map *map_events = skel->maps.events;
     int map_fd_events = bpf_map__fd(map_events);
@@ -287,7 +302,7 @@ int main(int argc, char **argv) {
     sfd = socket(AF_INET6, SOCK_RAW, IPPROTO_RAW);
 	if (sfd == -1) {
 		perror("Cannot create socket");
-		return -1;
+		goto cleanup;
 	}
 
     /*int optval;
@@ -299,24 +314,21 @@ int main(int argc, char **argv) {
     }*/
 
     /* Enter perf event handling for packet recovering */
-    handle_events(map_fd_events);
+    //handle_events(map_fd_events);
 
     /* Close socket */
     if (close(sfd) == -1) {
-		perror("Cannot close socket\n");
-		return -1;
+		perror("Cannot close socket");
+		goto cleanup;
 	}
 
-
+cleanup:
     // We reach this point when we Ctrl+C with signal handling
     /* Unpin the program and the maps to clean at exit */
     bpf_object__unpin_programs(skel->obj,  "/sys/fs/bpf/simple_me");
-    bpf_map__unpin(map_indexTable,         "/sys/fs/bpf/simple_me/indexTable");
-    bpf_map__unpin(map_sourceSymbolBuffer, "/sys/fs/bpf/simple_me/sourceSymbolBuffer");
-    bpf_map__unpin(map_repairSymbolBuffer, "/sys/fs/bpf/simple_me/repairSymbolBuffer");
+    bpf_map__unpin(map_fecBuffer, "/sys/fs/bpf/simple_me/fecBuffer");
     // Do not know if I have to unpin the perf event too
     bpf_map__unpin(map_events, "/sys/fs/bpf/simple_me/events");
     simple_lwt_seg6local_bpf__destroy(skel);
-cleanup:
     return 0;
 }

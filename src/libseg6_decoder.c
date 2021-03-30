@@ -1,5 +1,5 @@
-#ifndef VMLINUX_H_
-#define VMLINUX_H_
+#ifndef BPF_H_
+#define BPF_H_
 #include <linux/bpf.h>
 #endif
 #ifndef BPF_HELPERS_H_
