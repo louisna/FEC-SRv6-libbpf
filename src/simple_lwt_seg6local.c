@@ -308,7 +308,7 @@ int main(int argc, char *argv[]) {
     }*/
 
     /* Enter perf event handling for packet recovering */
-    handle_events(map_fd_events);
+    //handle_events(map_fd_events);
 
     /* Close socket */
     if (close(sfd) == -1) {
@@ -316,7 +316,7 @@ int main(int argc, char *argv[]) {
 		goto cleanup;
 	}
 
-
+cleanup:
     // We reach this point when we Ctrl+C with signal handling
     /* Unpin the program and the maps to clean at exit */
     bpf_object__unpin_programs(skel->obj,  "/sys/fs/bpf/simple_me");
@@ -324,6 +324,5 @@ int main(int argc, char *argv[]) {
     // Do not know if I have to unpin the perf event too
     bpf_map__unpin(map_events, "/sys/fs/bpf/simple_me/events");
     simple_lwt_seg6local_bpf__destroy(skel);
-cleanup:
     return 0;
 }

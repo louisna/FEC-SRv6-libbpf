@@ -43,9 +43,8 @@ struct {
 
 /* Perf even buffer */
 struct {
-    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-    __uint(key_size, sizeof(unsigned int));
-    __uint(value_size, sizeof(unsigned int));
+    __uint(type, BPF_MAP_TYPE_RINGBUF);
+    __uint(max_entries, 4096 * 32);
 } events SEC(".maps");
 
 static __always_inline int loadAndDoXOR(struct __sk_buff *skb, struct repairSymbol_t *repairSymbol, mapStruct_t *mapStruct)
@@ -272,14 +271,19 @@ int notify_ok(struct __sk_buff *skb)
         struct repairSymbol_t *repairSymbol = &(mapStruct->repairSymbol);
 
         /* Submit repair symbol(s) to User Space using perf events */
-        bpf_perf_event_output(skb, &events, BPF_F_CURRENT_CPU, repairSymbol, sizeof(struct repairSymbol_t));
+        struct repairSymbol_t *tmp = bpf_ringbuf_reserve(&events, sizeof(struct repairSymbol_t), 0);
+        if (!tmp) {
+            if (DEBUG) bpf_printk("Sender: impossible to send to user space\n");
+            return BPF_OK;
+        }
+        bpf_ringbuf_submit(repairSymbol, 0);
         if (DEBUG) bpf_printk("Sent bpf event event to user space\n");
     }
 
     /* Add the TLV to the current source symbol and forward */
     unsigned short tlv_length = sizeof(struct coding_source_t);
     err = seg6_add_tlv(skb, srh, (srh->hdrlen + 1) << 3, (struct sr6_tlv_t *)&tlv, tlv_length);
-    if (DEBUG || 1) bpf_printk("Sender: return value of TLV add: %d\n", err);
+    if (DEBUG) bpf_printk("Sender: return value of TLV add: %d\n", err);
     return (err) ? BPF_ERROR : BPF_OK;
 }
 
