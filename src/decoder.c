@@ -10,7 +10,7 @@
 #include <bpf/libbpf.h>
 #include "decoder.skel.h"
 #include <bpf/bpf.h>
-#include "fec_srv6.h"
+#include "decoder.h"
 
 #include <arpa/inet.h>
 #include <netinet/ip6.h>
@@ -18,28 +18,11 @@
 #include <netinet/udp.h>
 #include <linux/seg6.h>
 
-#define MAX_BLOCK 5  // Number of blocks we can simultaneously store
-
-/* Structures */
-struct sourceSymbol_t {
-    struct coding_source_t tlv;
-    unsigned char packet[MAX_PACKET_SIZE];
-    unsigned short packet_length;
-} BPF_PACKET_HEADER;
-
-struct repairSymbol_t {
-    unsigned char packet[MAX_PACKET_SIZE];
-    int packet_length; // TODO: change to u16 ?
-    struct coding_repair2_t tlv;
-};
-
-struct sourceBlock_t {
-    unsigned short blockID;
-    unsigned char rceivedSource;
-    unsigned char receivedRepair;
-    unsigned char nss;
-    unsigned char nrs;
-};
+typedef struct xorStruct {
+    struct sourceSymbol_t sourceSymbol;
+    struct repairSymbol_t repairSymbols;
+    struct sourceBlock_t sourceBlocks;
+} xorStruct_t;
 
 /* Used to detect the end of the program */
 static volatile int exiting = 0;
@@ -49,17 +32,17 @@ static volatile int sfd = -1;
 static struct sockaddr_in6 local_addr;
 
 int send_raw_socket(const struct repairSymbol_t *repairSymbol) {
-    struct sockaddr_in6 src;
+    // struct sockaddr_in6 src;
     struct sockaddr_in6 dst;
     uint8_t packet[4200];
     size_t packet_length;
     struct ip6_hdr *iphdr;
     struct ipv6_sr_hdr *srh;
-    struct udphdr *uhdr;
+    // struct udphdr *uhdr;
     size_t ip6_length = 40;
-    size_t srh_length = 0;
-    size_t udp_length = 8;
-    size_t pay_length = repairSymbol->packet_length;
+    // size_t srh_length = 0;
+    // size_t udp_length = 8;
+    // size_t pay_length = repairSymbol->packet_length;
     int next_segment_idx;
     int bytes; // Number of sent bytes
     int i;
@@ -79,7 +62,7 @@ int send_raw_socket(const struct repairSymbol_t *repairSymbol) {
     /* Get pointer to the IPv6 header and Segment Routing header */
     iphdr = (struct ip6_hdr *)&packet[0];
     srh = (struct ipv6_sr_hdr *)&packet[ip6_length];
-    srh_length = srh->hdrlen;
+    // srh_length = srh->hdrlen;
 
     /* Put new value of Hop Limit */
     iphdr->ip6_hops = 51;
@@ -116,12 +99,6 @@ int send_raw_socket(const struct repairSymbol_t *repairSymbol) {
 
     /* Update the value of next segment in the Segment Routing header */
     srh->segments_left = next_segment_idx;
-
-    packet[packet_length - 6] = 255;
-    packet[packet_length - 7] = 255;
-    packet[packet_length - 5] = 255;
-    packet[packet_length - 8] = 255;
-    packet[packet_length - 9] = 255;
 
     /* Send packet */
     bytes = sendto(sfd, packet, packet_length, 0, (struct sockaddr *)&dst, sizeof(dst));
@@ -203,11 +180,16 @@ int main(int argc, char **argv)
     struct decoder_bpf *skel;
     int err;
 
+    if (argc != 2) {
+        fprintf(stderr, "Usage: ./decoder <decoder_addr>");
+        return -1;
+    }
+
     /* Init the address structure for current node */
     memset(&local_addr, 0, sizeof(local_addr));
     local_addr.sin6_family = AF_INET6;
     // TODO: now it is hardcoded
-    if (inet_pton(AF_INET6, "fc00::9", local_addr.sin6_addr.s6_addr) != 1) {
+    if (inet_pton(AF_INET6, argv[1], local_addr.sin6_addr.s6_addr) != 1) {
         perror("inet ntop src");
         return -1;
     }
@@ -242,26 +224,12 @@ int main(int argc, char **argv)
     char *cmd = "sudo ip -6 route add fc00::9 encap seg6local action End.BPF endpoint fd /sys/fs/bpf/decoder/lwt_seg6local section decode dev enp0s3";
     printf("Command is %s\n", cmd);
 
-    int k0 = 0;
-
     /* Get file descriptor of maps and init the value of the structures */
-    struct bpf_map *map_sourceSymbolBuffer = skel->maps.sourceSymbolBuffer;
-    int map_fd_sourceSymbolBuffer = bpf_map__fd(map_sourceSymbolBuffer);
-    struct sourceSymbol_t source_zero = {};
-    bpf_map_update_elem(map_fd_sourceSymbolBuffer, &k0, &source_zero, BPF_ANY);
-
-    struct bpf_map *map_repairSymbolBuffer = skel->maps.repairSymbolBuffer;
-    int map_fd_repairSymbolBuffer = bpf_map__fd(map_repairSymbolBuffer);
-    for (int i = 0; i < MAX_BLOCK; ++i) { // Init each entry of the buffer
-        struct repairSymbol_t repair_zero = {};
-        bpf_map_update_elem(map_fd_repairSymbolBuffer, &i, &repair_zero, BPF_ANY);
-    }
-
-    struct bpf_map *map_blockBuffer = skel->maps.blockBuffer;
-    int map_fd_blockBuffer = bpf_map__fd(map_blockBuffer);
-    for (int i = 0; i < MAX_BLOCK; ++i) { // Init each entry of the buffer
-        struct sourceBlock_t block_zero = {};
-        bpf_map_update_elem(map_fd_blockBuffer, &i, &block_zero, BPF_ANY);
+    struct bpf_map *map_xorBuffer = skel->maps.xorBuffer;
+    int map_fd_xorBuffer = bpf_map__fd(map_xorBuffer);
+    for (int i = 0; i < MAX_BLOCK; ++i) {
+        xorStruct_t struct_zero = {};
+        bpf_map_update_elem(map_fd_xorBuffer, &i, &struct_zero, BPF_ANY);
     }
 
     struct bpf_map *map_events = skel->maps.events;
@@ -286,9 +254,7 @@ int main(int argc, char **argv)
     // We reach this point when we Ctrl+C with signal handling
     /* Unpin the program and the maps to clean at exit */
     bpf_object__unpin_programs(skel->obj,  "/sys/fs/bpf/decoder");
-    bpf_map__unpin(map_sourceSymbolBuffer, "/sys/fs/bpf/decoder/sourceSymbolBuffer");
-    bpf_map__unpin(map_repairSymbolBuffer, "/sys/fs/bpf/decoder/repairSymbolBuffer");
-    bpf_map__unpin(map_blockBuffer,        "/sys/fs/bpf/decoder/blockBuffer");
+    bpf_map__unpin(map_xorBuffer, "/sys/fs/bpf/decoder/xorBuffer");
     // Do not know if I have to unpin the perf event too
     bpf_map__unpin(map_events, "/sys/fs/bpf/decoder/events");
     decoder_bpf__destroy(skel);

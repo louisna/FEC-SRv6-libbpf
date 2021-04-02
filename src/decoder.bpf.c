@@ -8,66 +8,33 @@
 #endif
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
-#include "fec_srv6.h"
 #include "libseg6_decoder.c"
+#include "decoder.h"
 
-#define BPF_ERROR BPF_DROP  // Choose action when an error occurs in the process
-
-#define MAX_BLOCK 5  // Number of blocks we can simultaneously store
-#define MAX_SOURCE_SYMBOLS 25  // Number of source symbols per block
 #define DEBUG 1
 
-/* Structures */
-struct sourceSymbol_t {
-    struct coding_source_t tlv;
-    unsigned char packet[MAX_PACKET_SIZE];
-    unsigned short packet_length;
-} BPF_PACKET_HEADER;
-
-struct repairSymbol_t {
-    unsigned char packet[MAX_PACKET_SIZE];
-    int packet_length; // TODO: change to unsigned short ?
-    struct coding_repair2_t tlv;
-};
-
-struct sourceBlock_t {
-    unsigned short blockID;
-    unsigned char receivedSource;
-    unsigned char receivedRepair;
-    unsigned char nss;
-    unsigned char nrs;
-};
+typedef struct xorStruct {
+    struct sourceSymbol_t sourceSymbol;
+    struct repairSymbol_t repairSymbols;
+    struct sourceBlock_t sourceBlocks;
+} xorStruct_t;
 
 /* Maps */
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(max_entries, 1);
-    __type(key, unsigned int);
-    __type(value, struct sourceSymbol_t);
-} sourceSymbolBuffer SEC(".maps");
-
-struct {
-    __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, MAX_BLOCK);
-    __type(key, unsigned int);
-    __type(value, struct repairSymbol_t);
-} repairSymbolBuffer SEC(".maps");
-
-struct {
-    __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(max_entries, MAX_BLOCK);
-    __type(key, unsigned int);
-    __type(value, struct sourceBlock_t);
-} blockBuffer SEC(".maps");
+    __type(key, __u32);
+    __type(value, xorStruct_t);
+} xorBuffer SEC(".maps");
 
 /* Perf even buffer */
 struct {
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-    __uint(key_size, sizeof(unsigned int));
-    __uint(value_size, sizeof(unsigned int));
+    __uint(key_size, sizeof(__u32));
+    __uint(value_size, sizeof(__u32));
 } events SEC(".maps");
 
-static __always_inline int decodingSourceXOR_on_the_line(struct __sk_buff *skb, struct coding_source_t *tlv, struct sourceBlock_t *sourceBlock, int k_block) {
+static __always_inline int decodingSourceXOR_on_the_line(struct __sk_buff *skb, struct coding_source_t *tlv, struct sourceBlock_t *sourceBlock, int k_block, xorStruct_t *xorStruct) {
     int err;
     int k = 0;
 
@@ -75,22 +42,14 @@ static __always_inline int decodingSourceXOR_on_the_line(struct __sk_buff *skb, 
     void *data_end = (void *)(long)skb->data_end;
 
     /* Get a pointer to the source symbol structure from map */
-    struct sourceSymbol_t *sourceSymbol = bpf_map_lookup_elem(&sourceSymbolBuffer, &k);
-    if (!sourceSymbol) {
-        if (DEBUG) bpf_printk("Receiver: impossible to get pointer to source symbol");
-        return -1;
-    }
+    struct sourceSymbol_t *sourceSymbol = &(xorStruct->sourceSymbol);
     memset(sourceSymbol, 0, sizeof(struct sourceSymbol_t)); // Clean the source symbol from previous packet
 
     /* Copy the TLV in the pointer */
     memcpy(&(sourceSymbol->tlv), tlv, sizeof(struct coding_source_t));
 
     /* Get pointer to the repair symbol for decoding */
-    struct repairSymbol_t *repairSymbol = bpf_map_lookup_elem(&repairSymbolBuffer, &k_block);
-    if (!repairSymbol) {
-        if (DEBUG) bpf_printk("Receiver: impossible to get a pointer to the repair symbol (XOR)\n");
-        return -1;
-    }
+    struct repairSymbol_t *repairSymbol = &(xorStruct->repairSymbols);
 
     /* If this is the first received source symbol and we did not received yet
      * the repair symbol for this block, we reset the memory of the repair symbol
@@ -108,7 +67,7 @@ static __always_inline int decodingSourceXOR_on_the_line(struct __sk_buff *skb, 
     }
 
     /* Get the packet length from the IPv6 header to the end of the payload */
-    unsigned int packet_len = ((long)data_end) - ((long)(void *)ip6);
+    __u32 packet_len = ((long)data_end) - ((long)(void *)ip6);
     if ((void *)ip6 + packet_len > data_end) {
         if (DEBUG) bpf_printk("Receiver: inconsistent payload length\n");
         return -1;
@@ -120,11 +79,11 @@ static __always_inline int decodingSourceXOR_on_the_line(struct __sk_buff *skb, 
         return 1;
     }
 
-    unsigned int ipv6_offset = (long)ip6 - (long)data;
+    __u32 ipv6_offset = (long)ip6 - (long)data;
     if (ipv6_offset < 0) return -1;
 
     /* Load the payload of the packet and store it in sourceSymbol */
-    const unsigned short size = packet_len - 1; // Small trick here because the verifier thinks the value can be negative
+    const __u16 size = packet_len - 1; // Small trick here because the verifier thinks the value can be negative
     if (size < sizeof(sourceSymbol->packet) && ipv6_offset + size <= (long)data_end) {
         // TODO: 0xffff should be set as global => ensures that the size is the max classic size of IPv6 packt
         err = bpf_skb_load_bytes(skb, ipv6_offset, (void *)sourceSymbol->packet, (size & 0xffff) + 1);
@@ -168,10 +127,11 @@ static __always_inline int decodingSourceXOR_on_the_line(struct __sk_buff *skb, 
     srh->segments_left = 0;
 
     /* PERFORM XOR using 64 bites to have less iterations */
-    unsigned long *source_long = (unsigned long *)sourceSymbol->packet;
-    unsigned long *repair_long = (unsigned long *)repairSymbol->packet;
-    int j;
-    for (j = 0; j < MAX_PACKET_SIZE / sizeof(unsigned long); ++j) {
+    __u64 *source_long = (__u64 *)sourceSymbol->packet;
+    __u64 *repair_long = (__u64 *)repairSymbol->packet;
+
+    #pragma clang loop unroll(full)
+    for (int j = 0; j < MAX_PACKET_SIZE / sizeof(__u64); ++j) {
         repair_long[j] = repair_long[j] ^ source_long[j];
     }
 
@@ -186,7 +146,7 @@ static __always_inline int decodingSourceXOR_on_the_line(struct __sk_buff *skb, 
     return 0;
 }
 
-static __always_inline int decodingRepairXOR_on_the_line(struct __sk_buff *skb, struct ip6_srh_t *srh, struct coding_repair2_t *tlv, struct sourceBlock_t *sourceBlock, int k_block) {
+static __always_inline int decodingRepairXOR_on_the_line(struct __sk_buff *skb, struct ip6_srh_t *srh, struct coding_repair2_t *tlv, struct sourceBlock_t *sourceBlock, int k_block, xorStruct_t *xorStruct) {
     int err;
     int k = 0;
 
@@ -194,18 +154,10 @@ static __always_inline int decodingRepairXOR_on_the_line(struct __sk_buff *skb, 
     void *data_end = (void *)(long)skb->data_end;
     
     /* Load the repair symbol structure pointer */
-    struct repairSymbol_t *repairSymbol = bpf_map_lookup_elem(&repairSymbolBuffer, &k_block);
-    if (!repairSymbol) {
-        if (DEBUG) bpf_printk("Receiver: impossible to get a pointer to the repairSymbol (repair)\n");
-        return -1;
-    }
+    struct repairSymbol_t *repairSymbol = &(xorStruct->repairSymbols);
 
     /* Load the source symbol structure and reset it to clean from previous source symbol */
-    struct sourceSymbol_t *sourceSymbol = bpf_map_lookup_elem(&sourceSymbolBuffer, &k);
-    if (!sourceSymbol) {
-        if (DEBUG) bpf_printk("Receiver: impossible to get a pointer to the sourceSymbol (repair)\n");
-        return -1;
-    }
+    struct sourceSymbol_t *sourceSymbol = &(xorStruct->sourceSymbol);
 
     /* If no source symbol is received at this point, reset the repairSymbol from previous block */
     if (sourceBlock->receivedSource == 0) {
@@ -232,7 +184,7 @@ static __always_inline int decodingRepairXOR_on_the_line(struct __sk_buff *skb, 
     payload_pointer += 8 * sizeof(char);
 
     /* Get the packet payload length */
-    unsigned int payload_len = ((long)data_end) - ((long)payload_pointer);
+    __u32 payload_len = ((long)data_end) - ((long)payload_pointer);
     if (payload_pointer + payload_len > data_end) {
         if (DEBUG) bpf_printk("Receiver: inconsistent payload\n");
         return -1;
@@ -241,8 +193,8 @@ static __always_inline int decodingRepairXOR_on_the_line(struct __sk_buff *skb, 
     /* We use a small trick here. We cannot use the repairSymbol to store the repair symbol of the packet
      * because it may contain already decoded information. So we store it in sourceSymbol_t structure
      */
-    unsigned int payload_offset = (long)payload_pointer - (long)data;
-    const unsigned short size = payload_len - 1;
+    __u32 payload_offset = (long)payload_pointer - (long)data;
+    const __u16 size = payload_len - 1;
     if (size < sizeof(sourceSymbol->packet) && payload_offset + size <= (long)data_end) {
         err = bpf_skb_load_bytes(skb, payload_offset, (void *)sourceSymbol->packet, (size & 0xffff) + 1);
     } else {
@@ -258,10 +210,11 @@ static __always_inline int decodingRepairXOR_on_the_line(struct __sk_buff *skb, 
     repairSymbol->packet_length = repairSymbol->packet_length ^ tlv->payload_len;
     
     /* PERFORM XOR using 64 bites to have less iterations */
-    unsigned long *repair_long = (unsigned long *)repairSymbol->packet;
-    unsigned long *stored_long = (unsigned long *)sourceSymbol->packet;
-    int j;
-    for (j = 0; j < MAX_PACKET_SIZE / sizeof(unsigned long); ++j) {
+    __u64 *repair_long = (__u64 *)repairSymbol->packet;
+    __u64 *stored_long = (__u64 *)sourceSymbol->packet;
+
+    #pragma clang loop unroll(full)
+    for (int j = 0; j < MAX_PACKET_SIZE / sizeof(__u64); ++j) {
         repair_long[j] = repair_long[j] ^ stored_long[j];
     }
 
@@ -270,7 +223,7 @@ static __always_inline int decodingRepairXOR_on_the_line(struct __sk_buff *skb, 
     return 0;
 }
 
-static __always_inline unsigned short fecFrameworkSource(struct __sk_buff *skb, int tlv_offset, struct ip6_srh_t *srh) {
+static __always_inline xorStruct_t *fecFrameworkSource(struct __sk_buff *skb, int tlv_offset, struct ip6_srh_t *srh) {
     int err;
     int k = 0;
 
@@ -279,26 +232,28 @@ static __always_inline unsigned short fecFrameworkSource(struct __sk_buff *skb, 
     err = bpf_skb_load_bytes(skb, tlv_offset, &tlv, sizeof(struct coding_source_t));
     if (err < 0) {
         if (DEBUG) bpf_printk("Receiver: impossible to load the source TLV\n");
-        return -1;
+        return 0;
     }
 
     /* Get information about the source symbol */
-    unsigned short sourceBlockNb = tlv.sourceBlockNb;
-    unsigned short sourceSymbolNb = tlv.sourceSymbolNb;
+    __u16 sourceBlockNb = tlv.sourceBlockNb;
+    __u16 sourceSymbolNb = tlv.sourceSymbolNb;
 
     /* Get index of the repair symbol based on the block */
-    int k_block = sourceBlockNb % MAX_BLOCK;
+    __u32 k_block = sourceBlockNb % MAX_BLOCK;
     if (k_block < 0 || k_block >= MAX_BLOCK) { // TODO: remove this block because should be useless
         if (DEBUG) bpf_printk("Receiver: wrong block index from source framework\n");
-        return -1;
+        return 0;
+    }
+
+    xorStruct_t *xorStruct = bpf_map_lookup_elem(&xorBuffer, &k_block);
+    if (!xorStruct) {
+        if (DEBUG) bpf_printk("Receiver: impossible to get pointer to globla structure\n");
+        return 0;
     }
 
     /* Get information about this block number and update the structure */
-    struct sourceBlock_t *sourceBlock = bpf_map_lookup_elem(&blockBuffer, &k_block);
-    if (!sourceBlock) {
-        if (DEBUG) bpf_printk("Receiver: impossible to get a pointer to the source block (source framework)\n");
-        return -1;
-    }
+    struct sourceBlock_t *sourceBlock = &(xorStruct->sourceBlocks);
 
     /* If we already have information about this source block
      *      => Just increment the number of received source symbols for this block ID
@@ -318,7 +273,7 @@ static __always_inline unsigned short fecFrameworkSource(struct __sk_buff *skb, 
     err = seg6_delete_tlv2(skb, srh, tlv_offset);
     if (err != 0) {
         if (DEBUG) bpf_printk("Receiver: impossible to remove the source TLV from the packet\n");
-        return -1;
+        return 0;
     }
     
     /* Call decoding function. This function:
@@ -326,16 +281,16 @@ static __always_inline unsigned short fecFrameworkSource(struct __sk_buff *skb, 
      * 2) If this is the first source for this block, re-init the corresponding repair block
      * 3) Keep a copy of the TLV
      */
-    err = decodingSourceXOR_on_the_line(skb, &tlv, sourceBlock, k_block);
+    err = decodingSourceXOR_on_the_line(skb, &tlv, sourceBlock, k_block, xorStruct);
     if (err < 0) {
         if (DEBUG) bpf_printk("Receiver: error confirmed from decodingXOR\n");
-        return -1;
+        return 0;
     }
 
-    return sourceBlockNb;
+    return xorStruct;
 }
 
-static __always_inline unsigned short fecFrameworkRepair(struct __sk_buff *skb, int tlv_offset, struct ip6_srh_t *srh) {
+static __always_inline xorStruct_t *fecFrameworkRepair(struct __sk_buff *skb, int tlv_offset, struct ip6_srh_t *srh) {
     int err;
     int k0 = 0;
 
@@ -346,19 +301,21 @@ static __always_inline unsigned short fecFrameworkRepair(struct __sk_buff *skb, 
     err = bpf_skb_load_bytes(skb, tlv_offset, &tlv, sizeof(struct coding_repair2_t));
     if (err < 0) {
         if (DEBUG) bpf_printk("Receiver: impossible to load the repair TLV\n");
-        return -1;
+        return 0;
     }
 
     /* Retrieve the block number and the corresponding index */
-    unsigned short blockID = tlv.sourceBlockNb;
+    __u16 blockID = tlv.sourceBlockNb;
     int k_block = blockID % MAX_BLOCK;
 
-    /* Get information about this block number and update the structure */
-    struct sourceBlock_t *sourceBlock = bpf_map_lookup_elem(&blockBuffer, &k_block);
-    if (!sourceBlock) {
-        if (DEBUG) bpf_printk("Receiver: impossible to get a pointer to the source block (repair framework)\n");
-        return -1;
+    xorStruct_t *xorStruct = bpf_map_lookup_elem(&xorBuffer, &k_block);
+    if (!xorStruct) {
+        if (DEBUG) bpf_printk("Receiver: impossible to get pointer to globla structure\n");
+        return 0;
     }
+
+    /* Get information about this block number and update the structure */
+    struct sourceBlock_t *sourceBlock = &(xorStruct->sourceBlocks);
 
     /* If we already have information about this source block
      *      => Just add information about the repair symbol
@@ -378,20 +335,18 @@ static __always_inline unsigned short fecFrameworkRepair(struct __sk_buff *skb, 
      * 1) Stores the repair symbol for decoding (or directly decodes if XOR-on-the-line)
      * 2) If this is the first symbol for this block, re-init the corresponding repair block
      */
-    err = decodingRepairXOR_on_the_line(skb, srh, &tlv, sourceBlock, k_block);
+    err = decodingRepairXOR_on_the_line(skb, srh, &tlv, sourceBlock, k_block, xorStruct);
     if (err < 0) {
         if (DEBUG) bpf_printk("Receiver: error confirmed from decodingXOR repair\n");
-        return -1;
+        return 0;
     }
 
-    return blockID;
+    return xorStruct;
 
 }
 
-static __always_inline int canDecodeXOR(unsigned short blockID) {
-    int k = blockID % MAX_BLOCK;
-    struct sourceBlock_t *sourceBlock = bpf_map_lookup_elem(&blockBuffer, &k);
-    if (!sourceBlock) return 0;
+static __always_inline int canDecodeXOR(xorStruct_t *xorStruct) {
+    struct sourceBlock_t *sourceBlock = &(xorStruct->sourceBlocks);
 
     /* Still not received the repair symbol */
     if (!sourceBlock->receivedRepair) {
@@ -420,8 +375,8 @@ static __always_inline int canDecodeXOR(unsigned short blockID) {
 
 }
 
-static __always_inline int canDecode(unsigned short blockID) {
-    return canDecodeXOR(blockID);
+static __always_inline int canDecode(xorStruct_t *xorStruct) {
+    return canDecodeXOR(xorStruct);
 }
 
 SEC("lwt_seg6local")
@@ -449,31 +404,28 @@ int decode(struct __sk_buff *skb) {
         return BPF_ERROR;
     }
 
+    xorStruct_t *xorStruct;
+
     /* Call FEC framework depending on the type of packet */
-    unsigned short blockID; // Block number of the received packet
     if (tlv_type == TLV_CODING_SOURCE) {
-        blockID = fecFrameworkSource(skb, cursor, srh);
+        xorStruct = fecFrameworkSource(skb, cursor, srh);
     } else {
-        blockID = fecFrameworkRepair(skb, cursor, srh);
+        xorStruct = fecFrameworkRepair(skb, cursor, srh);
     }
-    if (blockID < 0) {
+    if (!xorStruct) {
         if (DEBUG) bpf_printk("Receiver: fec framework fail confirmed\n");
         return BPF_ERROR;
     }
 
     /* If we can recover from a loss, send the decoded information 
      * to user space to send new packet */
-    if (canDecode(blockID)) {
+    if (canDecode(xorStruct)) {
         // TODO: make it convertible for multiple coding functions
-        k = blockID % MAX_BLOCK;
-        struct repairSymbol_t *repairSymbol = bpf_map_lookup_elem(&repairSymbolBuffer, &k);
-        if (!repairSymbol) {
-            if (DEBUG) bpf_printk("Receiver: impossible to get repairSymbol pointer from sending\n");
-            return BPF_ERROR;
-        }
+        //struct repairSymbol_t *repairSymbol = &(xorStruct->repairSymbols);
+        //bpf_printk("%d\n", repairSymbol->packet_length);
 
         /* Submit repair symbol(s) to User Space using perf events */
-        bpf_perf_event_output(skb, &events, BPF_F_CURRENT_CPU, repairSymbol, sizeof(struct repairSymbol_t));
+        //bpf_perf_event_output(skb, &events, BPF_F_CURRENT_CPU, repairSymbol, sizeof(struct repairSymbol_t));
         if (DEBUG) bpf_printk("Receiver: sent bpf event to user space");
     }
 
@@ -483,7 +435,7 @@ int decode(struct __sk_buff *skb) {
     }
 
     if (DEBUG) bpf_printk("Receiver: done FEC\n");
-    return BPF_DROP;
+    return BPF_OK;
 }
 
 char LICENSE[] SEC("license") = "GPL";

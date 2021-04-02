@@ -25,58 +25,58 @@
 struct ethernet_t {
   unsigned long long  dst:48;
   unsigned long long  src:48;
-  unsigned int        type:16;
+  __u32        type:16;
 } BPF_PACKET_HEADER;
 
 struct dot1q_t {
-  unsigned short pri:3;
-  unsigned short cfi:1;
-  unsigned short vlanid:12;
-  unsigned short type;
+  __u16 pri:3;
+  __u16 cfi:1;
+  __u16 vlanid:12;
+  __u16 type;
 } BPF_PACKET_HEADER;
 
 struct arp_t {
-  unsigned short      htype;
-  unsigned short      ptype;
-  unsigned char       hlen;
-  unsigned char       plen;
-  unsigned short      oper;
+  __u16      htype;
+  __u16      ptype;
+  __u8       hlen;
+  __u8       plen;
+  __u16      oper;
   unsigned long long  sha:48;
   unsigned long long  spa:32;
   unsigned long long  tha:48;
-  unsigned int        tpa;
+  __u32        tpa;
 } BPF_PACKET_HEADER;
 
 struct ip_t {
-  unsigned char   ver:4;           // byte 0
-  unsigned char   hlen:4;
-  unsigned char   tos;
-  unsigned short  tlen;
-  unsigned short  identification; // byte 4
-  unsigned short  ffo_unused:1;
-  unsigned short  df:1;
-  unsigned short  mf:1;
-  unsigned short  foffset:13;
-  unsigned char   ttl;             // byte 8
-  unsigned char   nextp;
-  unsigned short  hchecksum;
-  unsigned int    src;            // byte 12
-  unsigned int    dst;            // byte 16
+  __u8   ver:4;           // byte 0
+  __u8   hlen:4;
+  __u8   tos;
+  __u16  tlen;
+  __u16  identification; // byte 4
+  __u16  ffo_unused:1;
+  __u16  df:1;
+  __u16  mf:1;
+  __u16  foffset:13;
+  __u8   ttl;             // byte 8
+  __u8   nextp;
+  __u16  hchecksum;
+  __u32    src;            // byte 12
+  __u32    dst;            // byte 16
 } BPF_PACKET_HEADER;
 
 struct icmp_t {
-  unsigned char   type;
-  unsigned char   code;
-  unsigned short  checksum;
+  __u8   type;
+  __u8   code;
+  __u16  checksum;
 } BPF_PACKET_HEADER;
 
 struct ip6_t {
-  unsigned int        ver:4;
-  unsigned int        priority:8;
-  unsigned int        flow_label:20;
-  unsigned short      payload_len;
-  unsigned char       next_header;
-  unsigned char       hop_limit;
+  __u32        ver:4;
+  __u32        priority:8;
+  __u32        flow_label:20;
+  __u16      payload_len;
+  __u8       next_header;
+  __u8       hop_limit;
   unsigned long long  src_hi;
   unsigned long long  src_lo;
   unsigned long long  dst_hi;
@@ -84,118 +84,118 @@ struct ip6_t {
 } BPF_PACKET_HEADER;
 
 struct ip6_addr_t {
-  unsigned char       addr[16];
+  __u8       addr[16];
 } BPF_PACKET_HEADER;
 
 struct ip6_opt_t {
-  unsigned char  next_header;
-  unsigned char  ext_len;
-  unsigned char  pad[6];
+  __u8  next_header;
+  __u8  ext_len;
+  __u8  pad[6];
 } BPF_PACKET_HEADER;
 
 struct icmp6_t {
-  unsigned char   type;
-  unsigned char   code;
-  unsigned short  checksum;
+  __u8   type;
+  __u8   code;
+  __u16  checksum;
 } BPF_PACKET_HEADER;
 
 struct udp_t {
-  unsigned short sport;
-  unsigned short dport;
-  unsigned short length;
-  unsigned short crc;
+  __u16 sport;
+  __u16 dport;
+  __u16 length;
+  __u16 crc;
 } BPF_PACKET_HEADER;
 
 struct tcp_t {
-  unsigned short  src_port;   // byte 0
-  unsigned short  dst_port;
-  unsigned int    seq_num;    // byte 4
-  unsigned int    ack_num;    // byte 8
-  unsigned char   offset:4;    // byte 12
-  unsigned char   reserved:4;
-  unsigned char   flag_cwr:1;
-  unsigned char   flag_ece:1;
-  unsigned char   flag_urg:1;
-  unsigned char   flag_ack:1;
-  unsigned char   flag_psh:1;
-  unsigned char   flag_rst:1;
-  unsigned char   flag_syn:1;
-  unsigned char   flag_fin:1;
-  unsigned short  rcv_wnd;
-  unsigned short  cksum;      // byte 16
-  unsigned short  urg_ptr;
+  __u16  src_port;   // byte 0
+  __u16  dst_port;
+  __u32    seq_num;    // byte 4
+  __u32    ack_num;    // byte 8
+  __u8   offset:4;    // byte 12
+  __u8   reserved:4;
+  __u8   flag_cwr:1;
+  __u8   flag_ece:1;
+  __u8   flag_urg:1;
+  __u8   flag_ack:1;
+  __u8   flag_psh:1;
+  __u8   flag_rst:1;
+  __u8   flag_syn:1;
+  __u8   flag_fin:1;
+  __u16  rcv_wnd;
+  __u16  cksum;      // byte 16
+  __u16  urg_ptr;
 } BPF_PACKET_HEADER;
 
 struct tcp2_t {
-  unsigned short src_port;
-  unsigned short dst_port;
-  unsigned int    seq_num;    // byte 4
-  unsigned int    ack_num;    // byte 8
-  unsigned char   offset:4;    // byte 12
-  unsigned char   reserved:4;
-  unsigned char   flags;
-  unsigned short  rcv_wnd;
-  unsigned short  cksum;      // byte 16
-  unsigned short  urg_ptr;
+  __u16 src_port;
+  __u16 dst_port;
+  __u32    seq_num;    // byte 4
+  __u32    ack_num;    // byte 8
+  __u8   offset:4;    // byte 12
+  __u8   reserved:4;
+  __u8   flags;
+  __u16  rcv_wnd;
+  __u16  cksum;      // byte 16
+  __u16  urg_ptr;
 } BPF_PACKET_HEADER;
 
 struct vxlan_t {
-  unsigned int rsv1:4;
-  unsigned int iflag:1;
-  unsigned int rsv2:3;
-  unsigned int rsv3:24;
-  unsigned int key:24;
-  unsigned int rsv4:8;
+  __u32 rsv1:4;
+  __u32 iflag:1;
+  __u32 rsv2:3;
+  __u32 rsv3:24;
+  __u32 key:24;
+  __u32 rsv4:8;
 } BPF_PACKET_HEADER;
 
 struct vxlan_gbp_t {
-  unsigned int gflag:1;
-  unsigned int rsv1:3;
-  unsigned int iflag:1;
-  unsigned int rsv2:3;
-  unsigned int rsv3:1;
-  unsigned int dflag:1;
-  unsigned int rsv4:1;
-  unsigned int aflag:1;
-  unsigned int rsv5:3;
-  unsigned int tag:16;
-  unsigned int key:24;
-  unsigned int rsv6:8;
+  __u32 gflag:1;
+  __u32 rsv1:3;
+  __u32 iflag:1;
+  __u32 rsv2:3;
+  __u32 rsv3:1;
+  __u32 dflag:1;
+  __u32 rsv4:1;
+  __u32 aflag:1;
+  __u32 rsv5:3;
+  __u32 tag:16;
+  __u32 key:24;
+  __u32 rsv6:8;
 } BPF_PACKET_HEADER;
 
 struct ip6_srh_t {
-  unsigned char nexthdr;
-  unsigned char hdrlen;
-  unsigned char type;
-  unsigned char segments_left;
-  unsigned char first_segment;
-  unsigned char flags;
-  unsigned short tag;
+  __u8 nexthdr;
+  __u8 hdrlen;
+  __u8 type;
+  __u8 segments_left;
+  __u8 first_segment;
+  __u8 flags;
+  __u16 tag;
 	
   struct ip6_addr_t segments[0];
 } BPF_PACKET_HEADER;
 
 
 struct sr6_tlv_t {
-    unsigned char type;
-    unsigned char len;
-    unsigned char value[0];
+    __u8 type;
+    __u8 len;
+    __u8 value[0];
 } BPF_PACKET_HEADER;
 
 struct sr6_tlv_128 {
-    unsigned char type;
-    unsigned char len;
-    unsigned char reserved;
-    unsigned char flags;
-    unsigned char value[16];
+    __u8 type;
+    __u8 len;
+    __u8 reserved;
+    __u8 flags;
+    __u8 value[16];
 } BPF_PACKET_HEADER;
 
 struct sr6_tlv_hmac {
-    unsigned char type;
-    unsigned char len;
-    unsigned short reserved;
-    unsigned int keyid;
-    unsigned char hmac[32];
+    __u8 type;
+    __u8 len;
+    __u16 reserved;
+    __u32 keyid;
+    __u8 hmac[32];
 } BPF_PACKET_HEADER;
 
 #define SR6_FLAG_PROTECTED (1 << 6)

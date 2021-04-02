@@ -9,22 +9,22 @@
 #define BPF_PACKET_HEADER __attribute__((packed))
 
 struct coding_source_t {
-    unsigned char tlv_type;
-    unsigned char len;
-    unsigned short sourceBlockNb;
-    unsigned short sourceSymbolNb;
+    __u8 tlv_type;
+    __u8 len;
+    __u16 sourceBlockNb;
+    __u16 sourceSymbolNb;
 } BPF_PACKET_HEADER;
 
 struct coding_repair2_t {
-    unsigned char tlv_type;
-    unsigned char len;
-    unsigned short sourceBlockNb;
-    unsigned short repairSymbolNb; // Will not be used for now
-    unsigned int repairFecInfo; // Repair FEC Information (32 bits)
-    unsigned short payload_len; // Payload length in bytes
-    unsigned char nss; // Number of Source Symbols
-    unsigned char nrs; // Number of Repair Symbols
-    unsigned short padding;
+    __u8 tlv_type;
+    __u8 len;
+    __u16 sourceBlockNb;
+    __u16 repairSymbolNb; // Will not be used for now
+    __u32 repairFecInfo; // Repair FEC Information (32 bits)
+    __u16 payload_len; // Payload length in bytes
+    __u8 nss; // Number of Source Symbols
+    __u8 nrs; // Number of Repair Symbols
+    __u16 padding;
 } BPF_PACKET_HEADER;
 
 #endif
