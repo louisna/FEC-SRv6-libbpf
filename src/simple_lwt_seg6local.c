@@ -28,7 +28,7 @@ struct sourceSymbol_t {
 struct repairSymbol_t {
     unsigned char packet[MAX_PACKET_SIZE];
     int packet_length;
-    unsigned char tlv[sizeof(struct coding_repair2_t)];
+    unsigned char tlv[sizeof(struct tlvRepair__block_t)];
 };
 
 typedef struct mapStruct {
@@ -37,6 +37,15 @@ typedef struct mapStruct {
     struct sourceSymbol_t sourceSymbol;
     struct repairSymbol_t repairSymbol;
 } mapStruct_t;
+
+#define RLC_BUFFER_SIZE 4
+typedef struct fecConvolution {
+    __u32 encodingSymbolID;
+    __u16 repairKey;
+    __u8 ringBuffSize; // Number of packets for next coding in the ring buffer
+    struct sourceSymbol_t sourceRingBuffer[RLC_BUFFER_SIZE];
+    struct repairSymbol_t repairSymbol;
+} fecConvolution_t;
 
 static volatile int sfd = -1;
 static volatile int first_sfd = 1;
@@ -129,7 +138,7 @@ int send_raw_socket(const struct repairSymbol_t *repairSymbol) {
     bcopy(&dst.sin6_addr, &(srh->segments[1]), 16);
 
     /* TLV */
-    tlv_length = sizeof(struct coding_repair2_t);
+    tlv_length = sizeof(struct tlvRepair__block_t);
     uint8_t *tlv_pointer = &packet[ip6_length + srh_length];
     bcopy(&repairSymbol->tlv, tlv_pointer, tlv_length);
 
@@ -292,6 +301,12 @@ int main(int argc, char *argv[]) {
     mapStruct_t struct_zero = {};
     bpf_map_update_elem(map_fd_fecBuffer, &k0, &struct_zero, BPF_ANY);
 
+    struct bpf_map *map_fecConvolutionBuffer = skel->maps.fecConvolutionInfoMap;
+    int map_fd_fecConvolutionBuffer = bpf_map__fd(map_fecConvolutionBuffer);
+    fecConvolution_t convo_struct_zero = {};
+    bpf_map_update_elem(map_fd_fecConvolutionBuffer, &k0, &convo_struct_zero, BPF_ANY);
+
+
     struct bpf_map *map_events = skel->maps.events;
     int map_fd_events = bpf_map__fd(map_events);
 
@@ -324,6 +339,7 @@ cleanup:
     /* Unpin the program and the maps to clean at exit */
     bpf_object__unpin_programs(skel->obj,  "/sys/fs/bpf/simple_me");
     bpf_map__unpin(map_fecBuffer, "/sys/fs/bpf/simple_me/fecBuffer");
+    bpf_map__unpin(map_fecConvolutionBuffer, "/sys/fs/bpf/simple_me/fecConvolutionInfoMap");
     // Do not know if I have to unpin the perf event too
     bpf_map__unpin(map_events, "/sys/fs/bpf/simple_me/events");
     simple_lwt_seg6local_bpf__destroy(skel);

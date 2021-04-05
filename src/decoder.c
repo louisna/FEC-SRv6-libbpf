@@ -232,6 +232,12 @@ int main(int argc, char **argv)
         bpf_map_update_elem(map_fd_xorBuffer, &i, &struct_zero, BPF_ANY);
     }
 
+    int k0 = 0;
+    struct bpf_map *map_fecConvolutionBuffer = skel->maps.fecConvolutionInfoMap;
+    int map_fd_fecConvolutionBuffer = bpf_map__fd(map_fecConvolutionBuffer);
+    fecConvolution_t convo_struct_zero = {};
+    bpf_map_update_elem(map_fd_fecConvolutionBuffer, &k0, &convo_struct_zero, BPF_ANY);
+
     struct bpf_map *map_events = skel->maps.events;
     int map_fd_events = bpf_map__fd(map_events);
 
@@ -255,6 +261,7 @@ int main(int argc, char **argv)
     /* Unpin the program and the maps to clean at exit */
     bpf_object__unpin_programs(skel->obj,  "/sys/fs/bpf/decoder");
     bpf_map__unpin(map_xorBuffer, "/sys/fs/bpf/decoder/xorBuffer");
+    bpf_map__unpin(map_fecConvolutionBuffer, "/sys/fs/bpf/decoder/fecConvolutionInfoMap");
     // Do not know if I have to unpin the perf event too
     bpf_map__unpin(map_events, "/sys/fs/bpf/decoder/events");
     decoder_bpf__destroy(skel);

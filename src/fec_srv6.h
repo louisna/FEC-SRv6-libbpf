@@ -8,14 +8,14 @@
 
 #define BPF_PACKET_HEADER __attribute__((packed))
 
-struct coding_source_t {
+struct tlvSource__block_t {
     __u8 tlv_type;
     __u8 len;
     __u16 sourceBlockNb;
     __u16 sourceSymbolNb;
 } BPF_PACKET_HEADER;
 
-struct coding_repair2_t {
+struct tlvRepair__block_t {
     __u8 tlv_type;
     __u8 len;
     __u16 sourceBlockNb;
@@ -24,6 +24,23 @@ struct coding_repair2_t {
     __u16 payload_len; // Payload length in bytes
     __u8 nss; // Number of Source Symbols
     __u8 nrs; // Number of Repair Symbols
+    __u16 padding;
+} BPF_PACKET_HEADER;
+
+struct tlvSource__convo_t {
+    __u8 tlv_type;
+    __u8 len;
+    __u32 encodingSymbolID;
+} BPF_PACKET_HEADER;
+
+struct tlvRepair__convo_t {
+    __u8 tlv_type;
+    __u8 len;
+    __u32 encodingSymbolID;
+    __u32 repairFecInfo; // TODO: split ?
+    __u16 payload_len;
+    __u8 nss;
+    __u8 nrs;
     __u16 padding;
 } BPF_PACKET_HEADER;
 
