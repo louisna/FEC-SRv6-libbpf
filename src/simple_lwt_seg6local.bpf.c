@@ -8,35 +8,11 @@
 #endif
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
-#include "fec_srv6.h"
 #include "libseg6.c"
-#include "../prng/tinymt32.c"
+#include "encoder.h"
 
 #define DEBUG 0
 #define BPF_ERROR BPF_DROP  // Choose action when an error occurs in the process
-
-#define RLC_BUFFER_SIZE 4
-#define RLC_WINDOW_SIZE 4
-#define RLC_WINDOW_SLIDE 2
-
-/* Structures */
-struct sourceSymbol_t {
-    __u16 packet_length;
-    __u8 packet[MAX_PACKET_SIZE];
-};
-
-struct repairSymbol_t {
-    int packet_length;
-    __u8 tlv[sizeof(struct tlvRepair__block_t)];
-    __u8 packet[MAX_PACKET_SIZE];
-};
-
-typedef struct mapStruct {
-    __u16 soubleBlock;
-    __u16 sourceSymbolCount;
-    struct sourceSymbol_t sourceSymbol;
-    struct repairSymbol_t repairSymbol;
-} mapStruct_t;
 
 /* Map */
 struct {
@@ -45,16 +21,6 @@ struct {
     __type(key, __u32);
     __type(value, mapStruct_t);
 } fecBuffer SEC(".maps");
-
-/* CONVOLUTION */
-typedef struct fecConvolution {
-    __u32 encodingSymbolID;
-    __u16 repairKey;
-    __u8 ringBuffSize; // Number of packets for next coding in the ring buffer
-    __u8 coefs[RLC_WINDOW_SIZE];
-    struct sourceSymbol_t sourceRingBuffer[RLC_BUFFER_SIZE];
-    struct repairSymbol_t repairSymbol;
-} fecConvolution_t;
 
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
@@ -326,54 +292,6 @@ static __always_inline int fecFramework(struct __sk_buff *skb, struct tlvSource_
     return err;
 }
 
-static __always_inline void get_coefs(tinymt32_t *prng, __u32 seed, int n, __u8 coefs[n]) {
-    tinymt32_init(prng, seed);
-    for (int i = 0; i < n; ++i) {
-        coefs[i] = (__u8) tinymt32_generate_uint32(prng);
-        if (coefs[i] == 0) {
-            coefs[i] = 1;
-        }
-    }
-}
-
-static __always_inline int generateRepairSymbols__convoRLC(struct __sk_buff *skb, fecConvolution_t *fecConvolution) {
-    int err;
-    __u16 max_length = 0;
-    __u32 encodingSymbolID = fecConvolution->encodingSymbolID;
-
-    /*  */
-    tinymt32_t prng;
-    prng.mat1 = 0x8f7011ee;
-    prng.mat2 = 0xfc78ff1f;
-    prng.tmat = 0x3793fdff;
-
-    /* Get array of coefficients */
-    get_coefs(&prng, fecConvolution->repairKey, RLC_WINDOW_SIZE, fecConvolution->coefs);
-    for (__u8 i = 0; i < RLC_WINDOW_SIZE; ++i) {
-        bpf_printk("Valeur du coef %d = %d\n", i, fecConvolution->coefs[i & 3]);
-    }
-
-    /* Get pointer to the repairSymbol */
-    struct repairSymbol_t *repairSymbol = &fecConvolution->repairSymbol;
-
-    /* Get the coefficients of this repair symbol */
-    // TODO
-    
-    for (__u8 i = 0; i < RLC_WINDOW_SIZE; ++i) {
-        /* Get the source symbol from the ring buffer */
-        __u8 sourceBufferIndex = (encodingSymbolID - RLC_WINDOW_SIZE + i) % RLC_BUFFER_SIZE;
-        struct sourceSymbol_t *sourceSymbol = &fecConvolution->sourceRingBuffer[sourceBufferIndex];
-
-        /* Compute the length of the biggest source symbol packet */
-        max_length = sourceSymbol->packet_length > max_length ? sourceSymbol->packet_length : max_length;
-
-        /* Add scaled the symbol to the repair symbol */
-        // TODO
-    }
-
-    return 0;
-}
-
 static __always_inline int fecScheme__convoRLC(struct __sk_buff *skb, fecConvolution_t *fecConvolution) {
     int err;
     __u32 encodingSymbolID = fecConvolution->encodingSymbolID;
@@ -388,7 +306,7 @@ static __always_inline int fecScheme__convoRLC(struct __sk_buff *skb, fecConvolu
         return -1;
     }
     // If verifier complains: try fecConvolution->sourceRingBuffer + ringBufferIndex
-    struct sourceSymbol_t *sourceSymbol = &fecConvolution->sourceRingBuffer[ringBufferIndex];
+    struct sourceSymbol_t *sourceSymbol = &fecConvolution->sourceRingBuffer[ringBufferIndex & 0xff];
     memset(sourceSymbol, 0, sizeof(struct sourceSymbol_t)); // Optimization: not use memset but use packet_length for all ?
 
     /* Store source symbol */
@@ -404,24 +322,18 @@ static __always_inline int fecScheme__convoRLC(struct __sk_buff *skb, fecConvolu
     /* The ring buffer contains a new source symbol */
     ++ringBuffSize;
 
-    bpf_printk("Oui oui est-ce que ca a fonctionne: %d %d %d\n", ringBufferIndex, sourceSymbol->packet_length, ringBuffSize);
+    //bpf_printk("Oui oui est-ce que ca a fonctionne: %d %d %d\n", ringBufferIndex, sourceSymbol->packet_length, ringBuffSize);
 
     /* Compute the repair symbol if needed */
     if (ringBuffSize == RLC_WINDOW_SIZE) {
-        /* Generate the repair symbol */
-        err = generateRepairSymbols__convoRLC(skb, fecConvolution);
-        if (err < 0) {
-            if (DEBUG) bpf_printk("Sender: error while generating the repair symbols of %d\n", encodingSymbolID);
-            return -1;
-        }
-
-        /* Create the TLV for this repairSymbol */
-        struct tlvRepair__convo_t *repairTlv = (struct tlvRepair__convo_t *)&fecConvolution->repairSymbol.tlv;
+        /* Start to complete the TLV for the repair symbol. The remaining will be done in US */
+        struct tlvRepair__convo_t *repairTlv = (struct tlvRepair__convo_t *)&fecConvolution->repairTlv;
+        // memset(repairTlv, 0, sizeof(tlvRepair__convo_t));
         repairTlv->tlv_type = TLV_CODING_REPAIR; // TODO: change also ?
         repairTlv->len = sizeof(struct tlvRepair__convo_t);
         repairTlv->encodingSymbolID = encodingSymbolID; // Set to the value of the last source symbol of the window
-        // repairTlv->repairFecInfo = (0 << 20) + (repairKey << 4) + DT;
-        repairTlv->payload_len = 0; // TODO: compute the coded length 
+        repairTlv->repairFecInfo = (0 << 20) + (repairKey << 4) + 0;
+        // repairTlv->payload_len = 0; // TODO: compute the coded length 
         repairTlv->nss = RLC_WINDOW_SIZE;
         repairTlv->nrs = 1;
 
@@ -458,13 +370,17 @@ static __always_inline int fecFramework__convolution(struct __sk_buff *skb, stru
         return -1;
     }
 
-    /* A repair symbol has been generated
-     * Prepare the coding TLV */
-    if (ret) {
-    }
-
     /* Update encodingSymbolID: wraps to zero after 2^32 - 1 */
     fecConvolution->encodingSymbolID = encodingSymbolID + 1;
+
+    /* A repair symbol must be generated
+     * Forward all data to user space for computation */
+    if (ret) {
+        if (DEBUG) bpf_printk("Send data to user space for repair symbol generation\n");
+        bpf_ringbuf_output(&events, fecConvolution, sizeof(fecConvolution_t), 0);
+
+        return 1;
+    }
 
     return ret;
 }
@@ -486,41 +402,35 @@ int notify_ok(struct __sk_buff *skb)
         return BPF_ERROR;
     }
 
-    /* Get pointer to structure of the plugin */
+    /* Get pointer to structure of the plugin
     mapStruct_t *mapStruct = bpf_map_lookup_elem(&fecBuffer, &k);
     if (!mapStruct) {
         if (DEBUG) bpf_printk("Sender: impossible to get global pointer\n");
         return BPF_ERROR;
-    }
+    } */
 
-    /* Create TLV structure and call FEC Framework */
+    /* Create TLV structure and call FEC Framework
     struct tlvSource__block_t tlv;
     err = fecFramework(skb, &tlv, mapStruct);
     if (err < 0) {
         if (DEBUG) bpf_printk("Sender: Error in FEC Framework\n");
         return BPF_ERROR;
-    }
+    } */
 
-    fecConvolution_t *test = bpf_map_lookup_elem(&fecConvolutionInfoMap, &k);
-    if (!test) return BPF_ERROR;
+    fecConvolution_t *fecConvolution = bpf_map_lookup_elem(&fecConvolutionInfoMap, &k);
+    if (!fecConvolution) return BPF_ERROR;
 
-    struct tlvSource__convo_t tlv_convo;
-    fecFramework__convolution(skb, &tlv_convo, test);
-
-    /* Send repair symbol(s) */
-    if (err == 1) { // The folloing is very specific to the XOR coding function
-        struct repairSymbol_t *repairSymbol = &(mapStruct->repairSymbol);
-
-        /* Submit repair symbol(s) to User Space using perf events */
-        
-        bpf_ringbuf_output(&events, repairSymbol, sizeof(struct repairSymbol_t), 0);
-        if (DEBUG) bpf_printk("Sent bpf event event to user space\n");
+    struct tlvSource__convo_t tlv;
+    err = fecFramework__convolution(skb, &tlv, fecConvolution);
+    if (err < 0) {
+        if (DEBUG) bpf_printk("Sender: Error in FEC Framework\n");
+        return BPF_ERROR;
     }
 
     /* Add the TLV to the current source symbol and forward */
-    __u16 tlv_length = sizeof(struct tlvSource__block_t);
+    __u16 tlv_length = sizeof(struct tlvSource__convo_t);
     err = seg6_add_tlv(skb, srh, (srh->hdrlen + 1) << 3, (struct sr6_tlv_t *)&tlv, tlv_length);
-    if (DEBUG) bpf_printk("Sender: return value of TLV add: %d\n", err);
+    bpf_printk("Sender: return value of TLV add: %d\n", err);
     return (err) ? BPF_ERROR : BPF_OK;
 }
 

@@ -14,28 +14,31 @@
  * LICENSE.txt
  */
 
+#include <stdint.h>
+#include <inttypes.h>
+
 #define TINYMT32_MEXP 127
 #define TINYMT32_SH0 1
 #define TINYMT32_SH1 10
 #define TINYMT32_SH8 8
-#define TINYMT32_MASK 0x7fffffff
+#define TINYMT32_MASK UINT32_C(0x7fffffff)
 #define TINYMT32_MUL (1.0f / 16777216.0f)
 
 /**
  * tinymt32 internal state vector and parameters
  */
 struct TINYMT32_T {
-    __u32 status[4];
-    __u32 mat1;
-    __u32 mat2;
-    __u32 tmat;
+    uint32_t status[4];
+    uint32_t mat1;
+    uint32_t mat2;
+    uint32_t tmat;
 };
 
 typedef struct TINYMT32_T tinymt32_t;
 
-static __attribute__((always_inline)) void tinymt32_init(tinymt32_t * random, __u32 seed);
-static __attribute__((always_inline)) void tinymt32_init_by_array(tinymt32_t * random, __u32 init_key[],
-                            int key_length);
+static void tinymt32_init(tinymt32_t * random, uint32_t seed);
+/*static void tinymt32_init_by_array(tinymt32_t * random, uint32_t init_key[],
+                            int key_length);*/
 
 #if defined(__GNUC__)
 /**
@@ -43,19 +46,19 @@ static __attribute__((always_inline)) void tinymt32_init_by_array(tinymt32_t * r
  * @param random not used
  * @return always 127
  */
-__attribute__((always_inline)) static int tinymt32_get_mexp(
+/*static int tinymt32_get_mexp(
     tinymt32_t * random  __attribute__((unused))) {
     return TINYMT32_MEXP;
-}
+}*/
 
 /**
  * This function changes internal state of tinymt32.
  * Users should not call this function directly.
  * @param random tinymt internal status
  */
-__attribute__((always_inline)) static void tinymt32_next_state(tinymt32_t * random) {
-    __u32 x;
-    __u32 y;
+static void tinymt32_next_state(tinymt32_t * random) {
+    uint32_t x;
+    uint32_t y;
 
     y = random->status[3];
     x = (random->status[0] & TINYMT32_MASK)
@@ -77,8 +80,8 @@ __attribute__((always_inline)) static void tinymt32_next_state(tinymt32_t * rand
  * @param random tinymt internal status
  * @return 32-bit unsigned pseudorandom number
  */
-__attribute__((always_inline)) static __u32 tinymt32_temper(tinymt32_t * random) {
-    __u32 t0, t1;
+static uint32_t tinymt32_temper(tinymt32_t * random) {
+    uint32_t t0, t1;
     t0 = random->status[3];
 #if defined(LINEARITY_CHECK)
     t1 = random->status[0]
@@ -98,10 +101,10 @@ __attribute__((always_inline)) static __u32 tinymt32_temper(tinymt32_t * random)
  * @param random tinymt internal status
  * @return floating point number r (1.0 <= r < 2.0)
  */
-__attribute__((always_inline)) static float tinymt32_temper_conv(tinymt32_t * random) {
-    __u32 t0, t1;
+/*static float tinymt32_temper_conv(tinymt32_t * random) {
+    uint32_t t0, t1;
     union {
-        __u32 u;
+        uint32_t u;
         float f;
     } conv;
 
@@ -117,7 +120,7 @@ __attribute__((always_inline)) static float tinymt32_temper_conv(tinymt32_t * ra
     conv.u = ((t0 ^ (-((int)(t1 & 1)) & random->tmat)) >> 9)
              | (0x3f800000);
     return conv.f;
-}
+}*/
 
 /**
  * This function outputs floating point number from internal state.
@@ -125,10 +128,10 @@ __attribute__((always_inline)) static float tinymt32_temper_conv(tinymt32_t * ra
  * @param random tinymt internal status
  * @return floating point number r (1.0 < r < 2.0)
  */
-__attribute__((always_inline)) static float tinymt32_temper_conv_open(tinymt32_t * random) {
-    __u32 t0, t1;
+/*static float tinymt32_temper_conv_open(tinymt32_t * random) {
+    uint32_t t0, t1;
     union {
-        __u32 u;
+        uint32_t u;
         float f;
     } conv;
 
@@ -144,14 +147,14 @@ __attribute__((always_inline)) static float tinymt32_temper_conv_open(tinymt32_t
     conv.u = ((t0 ^ (-((int)(t1 & 1)) & random->tmat)) >> 9)
              | (0x3f800001);
     return conv.f;
-}
+}*/
 
 /**
  * This function outputs 32-bit unsigned integer from internal state.
  * @param random tinymt internal status
  * @return 32-bit unsigned integer r (0 <= r < 2^32)
  */
-__attribute__((always_inline)) static __u32 tinymt32_generate_uint32(tinymt32_t * random) {
+static uint32_t tinymt32_generate_uint32(tinymt32_t * random) {
     tinymt32_next_state(random);
     return tinymt32_temper(random);
 }
@@ -164,10 +167,10 @@ __attribute__((always_inline)) static __u32 tinymt32_generate_uint32(tinymt32_t 
  * @param random tinymt internal status
  * @return floating point number r (0.0 <= r < 1.0)
  */
-__attribute__((always_inline)) static float tinymt32_generate_float(tinymt32_t * random) {
+/*static float tinymt32_generate_float(tinymt32_t * random) {
     tinymt32_next_state(random);
     return (tinymt32_temper(random) >> 8) * TINYMT32_MUL;
-}
+}*/
 
 /**
  * This function outputs floating point number from internal state.
@@ -175,10 +178,10 @@ __attribute__((always_inline)) static float tinymt32_generate_float(tinymt32_t *
  * @param random tinymt internal status
  * @return floating point number r (1.0 <= r < 2.0)
  */
-__attribute__((always_inline)) static float tinymt32_generate_float12(tinymt32_t * random) {
+/*static float tinymt32_generate_float12(tinymt32_t * random) {
     tinymt32_next_state(random);
     return tinymt32_temper_conv(random);
-}
+}*/
 
 /**
  * This function outputs floating point number from internal state.
@@ -186,10 +189,10 @@ __attribute__((always_inline)) static float tinymt32_generate_float12(tinymt32_t
  * @param random tinymt internal status
  * @return floating point number r (0.0 <= r < 1.0)
  */
-__attribute__((always_inline)) static float tinymt32_generate_float01(tinymt32_t * random) {
+/*static float tinymt32_generate_float01(tinymt32_t * random) {
     tinymt32_next_state(random);
     return tinymt32_temper_conv(random) - 1.0f;
-}
+}*/
 
 /**
  * This function outputs floating point number from internal state.
@@ -197,10 +200,10 @@ __attribute__((always_inline)) static float tinymt32_generate_float01(tinymt32_t
  * @param random tinymt internal status
  * @return floating point number r (0.0 < r <= 1.0)
  */
-__attribute__((always_inline)) static float tinymt32_generate_floatOC(tinymt32_t * random) {
+/*static float tinymt32_generate_floatOC(tinymt32_t * random) {
     tinymt32_next_state(random);
     return 1.0f - tinymt32_generate_float(random);
-}
+}*/
 
 /**
  * This function outputs floating point number from internal state.
@@ -208,10 +211,10 @@ __attribute__((always_inline)) static float tinymt32_generate_floatOC(tinymt32_t
  * @param random tinymt internal status
  * @return floating point number r (0.0 < r < 1.0)
  */
-__attribute__((always_inline)) static float tinymt32_generate_floatOO(tinymt32_t * random) {
+/*static float tinymt32_generate_floatOO(tinymt32_t * random) {
     tinymt32_next_state(random);
     return tinymt32_temper_conv_open(random) - 1.0f;
-}
+}*/
 
 /**
  * This function outputs double precision floating point number from
@@ -221,10 +224,10 @@ __attribute__((always_inline)) static float tinymt32_generate_floatOO(tinymt32_t
  * @param random tinymt internal status
  * @return floating point number r (0.0 <= r < 1.0)
  */
-__attribute__((always_inline)) static double tinymt32_generate_32double(tinymt32_t * random) {
+/*static double tinymt32_generate_32double(tinymt32_t * random) {
     tinymt32_next_state(random);
     return tinymt32_temper(random) * (1.0 / 4294967296.0);
-}
+}*/
 
 
 #endif
@@ -258,9 +261,9 @@ __attribute__((always_inline)) static double tinymt32_generate_32double(tinymt32
  * @param x 32-bit integer
  * @return 32-bit integer
  */
-static __attribute__((always_inline)) __u32 ini_func1(__u32 x) {
+/*static uint32_t ini_func1(uint32_t x) {
     return (x ^ (x >> 27)) * (1664525);
-}
+}*/
 
 /**
  * This function represents a function used in the initialization
@@ -268,15 +271,15 @@ static __attribute__((always_inline)) __u32 ini_func1(__u32 x) {
  * @param x 32-bit integer
  * @return 32-bit integer
  */
-static __attribute__((always_inline)) __u32 ini_func2(__u32 x) {
+/*static uint32_t ini_func2(uint32_t x) {
     return (x ^ (x >> 27)) * (1566083941);
-}
+}*/
 
 /**
  * This function certificate the period of 2^127-1.
  * @param random tinymt state vector.
  */
-static __attribute__((always_inline)) void period_certification(tinymt32_t * random) {
+static void period_certification(tinymt32_t * random) {
     if ((random->status[0] & TINYMT32_MASK) == 0 &&
 	random->status[1] == 0 &&
 	random->status[2] == 0 &&
@@ -294,7 +297,7 @@ static __attribute__((always_inline)) void period_certification(tinymt32_t * ran
  * @param random tinymt state vector.
  * @param seed a 32-bit unsigned integer used as a seed.
  */
-static __attribute__((always_inline)) void tinymt32_init(tinymt32_t * random, __u32 seed) {
+static void tinymt32_init(tinymt32_t * random, uint32_t seed) {
     random->status[0] = seed;
     random->status[1] = random->mat1;
     random->status[2] = random->mat2;
@@ -317,15 +320,15 @@ static __attribute__((always_inline)) void tinymt32_init(tinymt32_t * random, __
  * @param init_key the array of 32-bit integers, used as a seed.
  * @param key_length the length of init_key.
  */
-static __attribute__((always_inline)) void tinymt32_init_by_array(tinymt32_t * random, __u32 init_key[],
+/*static void tinymt32_init_by_array(tinymt32_t * random, uint32_t init_key[],
 			    int key_length) {
     const int lag = 1;
     const int mid = 1;
     const int size = 4;
     int i, j;
     int count;
-    __u32 r;
-    __u32 * st = &random->status[0];
+    uint32_t r;
+    uint32_t * st = &random->status[0];
 
     st[0] = 0;
     st[1] = random->mat1;
@@ -377,4 +380,4 @@ static __attribute__((always_inline)) void tinymt32_init_by_array(tinymt32_t * r
     for (i = 0; i < PRE_LOOP; i++) {
 	tinymt32_next_state(random);
     }
-}
+}*/

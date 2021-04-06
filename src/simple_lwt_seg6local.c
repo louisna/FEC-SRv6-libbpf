@@ -10,44 +10,14 @@
 #include <bpf/libbpf.h>
 #include "simple_lwt_seg6local.skel.h"
 #include <bpf/bpf.h>
-#include "fec_srv6.h"
+#include "encoder.h"
+#include "fec_scheme/rlc_gf256.c"
 
 #include <arpa/inet.h>
 #include <netinet/ip6.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 #include <linux/seg6.h>
-//#include "socket_handler.h"
-
-/* Structures */
-struct sourceSymbol_t {
-    unsigned char packet[MAX_PACKET_SIZE];
-    uint16_t packet_length;
-} BPF_PACKET_HEADER;
-
-struct repairSymbol_t {
-    unsigned char packet[MAX_PACKET_SIZE];
-    int packet_length;
-    unsigned char tlv[sizeof(struct tlvRepair__block_t)];
-};
-
-typedef struct mapStruct {
-    unsigned short soubleBlock;
-    unsigned short sourceSymbolCount;
-    struct sourceSymbol_t sourceSymbol;
-    struct repairSymbol_t repairSymbol;
-} mapStruct_t;
-
-#define RLC_BUFFER_SIZE 4
-#define RLC_WINDOW_SIZE 4
-typedef struct fecConvolution {
-    __u32 encodingSymbolID;
-    __u16 repairKey;
-    __u8 ringBuffSize; // Number of packets for next coding in the ring buffer
-    __u8 coefs[RLC_WINDOW_SIZE];
-    struct sourceSymbol_t sourceRingBuffer[RLC_BUFFER_SIZE];
-    struct repairSymbol_t repairSymbol;
-} fecConvolution_t;
 
 static volatile int sfd = -1;
 static volatile int first_sfd = 1;
@@ -55,6 +25,8 @@ static uint64_t total = 0;
 
 static struct sockaddr_in6 src;
 static struct sockaddr_in6 dst;
+
+encode_rlc_t *rlc = NULL;
 
 /* From https://github.com/gih900/IPv6--DNS-Frag-Test-Rig/blob/master/dns-server-frag.c */
 uint16_t udp_checksum(const void *buff, size_t len, struct in6_addr *src_addr, struct in6_addr *dest_addr) {
@@ -201,7 +173,7 @@ static int send_repairSymbol_XOR(void *ctx, void *data, size_t data_sz) {
      * ->packet_length: the length of the repair symbol
      * ->tlv: the TLV to be added in the SRH header 
      */
-    const struct repairSymbol_t *repairSymbol = (struct repairSymbol_t *)data;
+    //const struct repairSymbol_t *repairSymbol = (struct repairSymbol_t *)data;
     if (total % 10000 == 0) printf("CALL TRIGGERED!\n");
 
     ++total;
@@ -209,12 +181,31 @@ static int send_repairSymbol_XOR(void *ctx, void *data, size_t data_sz) {
     //send_raw_socket(repairSymbol);
 }
 
+static int fecScheme(void *ctx, void *data, size_t data_sz) {
+    fecConvolution_t *fecConvolution = (fecConvolution_t *)data;
+    printf("Call triggered: %d\n", fecConvolution->encodingSymbolID);
+
+    /* Reset the content of the repair symbol from previous call */
+    memset(rlc->repairSymbol, 0, sizeof(struct repairSymbol_t));
+
+    /* Generate the repair symbol */
+    int err = rlc__generateRepairSymbols(fecConvolution, rlc);
+    if (err < 0) {
+        printf("ERROR. TODO: handle\n");
+        return -1;
+    }
+
+    /* Send the repair symbol */
+    send_raw_socket(rlc->repairSymbol);
+    return 0;
+}
+
 static void handle_events(int map_fd_events) {
     /* Define structure for the perf event */
     struct ring_buffer *rb = NULL;
     int err;
 
-    rb = ring_buffer__new(map_fd_events, send_repairSymbol_XOR, NULL, NULL);
+    rb = ring_buffer__new(map_fd_events, fecScheme, NULL, NULL);
     if (!rb) {
         rb = NULL;
         fprintf(stderr, "Impossible to open perf event\n");
@@ -327,6 +318,13 @@ int main(int argc, char *argv[]) {
         return -1;
     }*/
 
+    /* Initialize structure for RLC */
+    rlc = initialize_rlc();
+    if (!rlc) {
+        perror("Cannot create structure");
+        goto cleanup;
+    }
+
     /* Enter perf event handling for packet recovering */
     handle_events(map_fd_events);
 
@@ -336,10 +334,13 @@ int main(int argc, char *argv[]) {
 		goto cleanup;
 	}
 
+    /* Free memory of the RLC structure */
+    free(rlc);
+
 cleanup:
     // We reach this point when we Ctrl+C with signal handling
     /* Unpin the program and the maps to clean at exit */
-    bpf_object__unpin_programs(skel->obj,  "/sys/fs/bpf/simple_me");
+    bpf_object__unpin_programs(skel->obj, "/sys/fs/bpf/simple_me");
     bpf_map__unpin(map_fecBuffer, "/sys/fs/bpf/simple_me/fecBuffer");
     bpf_map__unpin(map_fecConvolutionBuffer, "/sys/fs/bpf/simple_me/fecConvolutionInfoMap");
     // Do not know if I have to unpin the perf event too
