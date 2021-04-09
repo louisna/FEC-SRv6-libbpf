@@ -334,10 +334,9 @@ int main(int argc, char *argv[]) {
 		goto cleanup;
 	}
 
+cleanup:
     /* Free memory of the RLC structure */
     free(rlc);
-
-cleanup:
     // We reach this point when we Ctrl+C with signal handling
     /* Unpin the program and the maps to clean at exit */
     bpf_object__unpin_programs(skel->obj, "/sys/fs/bpf/simple_me");

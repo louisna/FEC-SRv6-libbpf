@@ -11,6 +11,8 @@
 #include "decoder.skel.h"
 #include <bpf/bpf.h>
 #include "decoder.h"
+// #include "fec/fec.c"
+#include "fec_scheme/rlc_gf256_decode.c"
 
 #include <arpa/inet.h>
 #include <netinet/ip6.h>
@@ -30,6 +32,8 @@ static volatile int exiting = 0;
 static volatile int sfd = -1;
 
 static struct sockaddr_in6 local_addr;
+
+decode_rlc_t *rlc = NULL;
 
 int send_raw_socket(const struct repairSymbol_t *repairSymbol) {
     // struct sockaddr_in6 src;
@@ -144,10 +148,23 @@ static void send_recovered_symbol_XOR(void *ctx, int cpu, void *data, __u32 data
     send_raw_socket(repairSymbol);
 }
 
+static void fecScheme(void *ctx, int cpu, void *data, uint32_t data_sz) {
+    fecConvolution_t *fecConvolution = (fecConvolution_t *)data;
+    printf("Call triggered: %d\n", fecConvolution->encodingSymbolID);
+
+    /* Generate the repair symbol */
+    int err = rlc__fec_recover(fecConvolution, rlc);
+    if (err < 0) {
+        printf("ERROR. TODO: handle\n");
+    } else {
+        printf("Correctly finished\n");
+    }
+}
+
 static void handle_events(int map_fd_events) {
     /* Define structure for the perf event */
     struct perf_buffer_opts pb_opts = {
-        .sample_cb = send_recovered_symbol_XOR,
+        .sample_cb = fecScheme,
     };
     struct perf_buffer *pb = NULL;
     int err;
@@ -248,6 +265,13 @@ int main(int argc, char **argv)
         goto cleanup;
     }
 
+    /* Initialize structure for RLC */
+    rlc = initialize_rlc_decode();
+    if (!rlc) {
+        perror("Cannot create RLC structure");
+        goto cleanup;
+    }
+
     /* Enter perf event handling for packet recovering */
     handle_events(map_fd_events);
 
@@ -257,6 +281,9 @@ int main(int argc, char **argv)
         goto cleanup;
     }
 
+cleanup:
+    /* Free memory of the RLC structure */
+    free(rlc);
     // We reach this point when we Ctrl+C with signal handling
     /* Unpin the program and the maps to clean at exit */
     bpf_object__unpin_programs(skel->obj,  "/sys/fs/bpf/decoder");
@@ -265,6 +292,5 @@ int main(int argc, char **argv)
     // Do not know if I have to unpin the perf event too
     bpf_map__unpin(map_events, "/sys/fs/bpf/decoder/events");
     decoder_bpf__destroy(skel);
-cleanup:
     return 0;
 }

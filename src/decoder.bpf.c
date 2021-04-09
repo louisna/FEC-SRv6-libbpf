@@ -461,6 +461,16 @@ static __always_inline int storePacket(struct __sk_buff *skb, struct sourceSymbo
     return 0;
 }
 
+static __always_inline int try_to_recover_from_repair__convolution(struct __sk_buff *skb, fecConvolution_t *fecConvolution, window_info_t *window_info) {
+    /* Analyze if we can recover from a lost packet
+     * If we can, send the window alongside with the repair symbol(s) to user space */
+    if (window_info->received_ss < RLC_WINDOW_SIZE && window_info->received_rs > 0) {
+        // TODO: improve by not sending the entire structure !
+        bpf_perf_event_output(skb, &events, BPF_F_CURRENT_CPU, fecConvolution, sizeof(fecConvolution_t));
+    }
+    return 0;
+}
+
 static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *skb, struct ip6_srh_t *srh, int tlv_offset) {
     int err;
     int k = 0;
@@ -502,7 +512,7 @@ static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *sk
     // See if the packet is already in the buffer
     struct tlvSource__convo_t *tlv_ss = (struct tlvSource__convo_t *)&sourceSymbol->tlv;
     if (tlv_ss->encodingSymbolID == encodingSymbolID) {
-        if (DEBUG) bpf_printk("Receiver: source symbol already in the buffer\n");
+        if (DEBUG) bpf_printk("Receiver: source symbol already in the buffer: %d %d\n", tlv_ss->encodingSymbolID, encodingSymbolID);
         return -1;
     }
     // Otherwise we just reset the location
@@ -533,9 +543,8 @@ static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *sk
     }
 
     /* Try to recover from lost packet */
-    // TODO;
-
-    return 0;
+    // TODO
+    return 0; //try_to_recover__convolution(skb, fecConvolution);
 }
 
 static __always_inline int receiveRepairSymbol__convolution(struct __sk_buff *skb, struct ip6_srh_t *srh, int tlv_offset) {
@@ -602,10 +611,9 @@ static __always_inline int receiveRepairSymbol__convolution(struct __sk_buff *sk
         }
     }
 
-    /* Try to recover from lost packet */
-    // TODO
+    fecConvolution->encodingSymbolID = encodingSymbolID;
 
-    return 0;
+    return try_to_recover_from_repair__convolution(skb, fecConvolution, window_info);
 }
 
 SEC("lwt_seg6local")
@@ -633,7 +641,7 @@ int decode(struct __sk_buff *skb) {
         return BPF_ERROR;
     }
 
-    xorStruct_t *xorStruct = 0;
+    //xorStruct_t *xorStruct = 0;
 
     /* Call FEC framework depending on the type of packet */
     if (tlv_type == TLV_CODING_SOURCE) {
@@ -643,22 +651,15 @@ int decode(struct __sk_buff *skb) {
         //xorStruct = fecFrameworkRepair(skb, cursor, srh);
         err = receiveRepairSymbol__convolution(skb, srh, cursor);
     }
+
+    if (err < 0) {
+        bpf_printk("Receiver: error confirmed\n");
+        return BPF_ERROR;
+    }
     /*if (!xorStruct) {
         if (DEBUG) bpf_printk("Receiver: fec framework fail confirmed\n");
         return BPF_ERROR;
     }*/
-
-    /* If we can recover from a loss, send the decoded information 
-     * to user space to send new packet */
-    if (0 && canDecode(xorStruct)) {
-        // TODO: make it convertible for multiple coding functions
-        //struct repairSymbol_t *repairSymbol = &(xorStruct->repairSymbols);
-        //bpf_printk("%d\n", repairSymbol->packet_length);
-
-        /* Submit repair symbol(s) to User Space using perf events */
-        //bpf_perf_event_output(skb, &events, BPF_F_CURRENT_CPU, repairSymbol, sizeof(struct repairSymbol_t));
-        if (DEBUG) bpf_printk("Receiver: sent bpf event to user space");
-    }
 
     /* The repair symbol(s) must be dropped because not useful for the rest of the network */
     if (tlv_type == TLV_CODING_REPAIR) {

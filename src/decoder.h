@@ -1,3 +1,6 @@
+#ifndef DECODER_STRUCT_H
+#define DECODER_STRUCT_H
+
 #include "fec_srv6.h"
 
 #define BPF_ERROR BPF_DROP  // Choose action when an error occurs in the process
@@ -37,10 +40,23 @@ typedef struct {
     __u32 encodingSymbolID;
 } window_info_t;
 
-typedef struct fecConvolution {
-    __u32 encodingSymbolID;
+typedef struct {
+    __u32 encodingSymbolID; // Of the current repair symbol
     __u16 repairKey;
     __u8 ringBuffSize; // Number of packets for next coding in the ring buffer
     struct sourceSymbol_t sourceRingBuffer[RLC_RECEIVER_BUFFER_SIZE];
     window_info_t windowInfoBuffer[RLC_RECEIVER_BUFFER_SIZE];
 } fecConvolution_t;
+
+typedef struct {
+    __u32 encodingSymbolID;
+    __u8 packet[MAX_PACKET_SIZE];
+} recoveredSource_t;
+
+typedef struct {
+    __u8 *muls;
+    __u8 *table_inv;
+    recoveredSource_t *recoveredSources[RLC_RECEIVER_BUFFER_SIZE];
+} decode_rlc_t;
+
+#endif
