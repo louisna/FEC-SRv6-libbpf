@@ -28,10 +28,14 @@ static int rlc__generateRepairSymbols(fecConvolution_t *fecConvolution, encode_r
     if (!coefs) return -1;
 
     rlc__get_coefs(&prng, fecConvolution->repairKey, RLC_WINDOW_SIZE, coefs);
+    printf("repairKey is %d\n", fecConvolution->repairKey);
+    for (int jj = 0; jj < RLC_WINDOW_SIZE; ++jj) {
+        printf("Valeur du coef: %d\n", coefs[jj]);
+    }
 
     for (uint8_t i = 0; i < RLC_WINDOW_SIZE; ++i) {
         /* Get the source symbol in order in the window */
-        uint8_t sourceBufferIndex = (encodingSymbolID - RLC_WINDOW_SIZE + i) % RLC_BUFFER_SIZE;
+        uint8_t sourceBufferIndex = (encodingSymbolID - RLC_WINDOW_SIZE + i + 1) % RLC_BUFFER_SIZE;
         struct sourceSymbol_t *sourceSymbol = &fecConvolution->sourceRingBuffer[sourceBufferIndex];
 
         /* Compute the maximum length of the source symbols */
@@ -40,11 +44,12 @@ static int rlc__generateRepairSymbols(fecConvolution_t *fecConvolution, encode_r
 
     for (uint8_t i = 0; i < RLC_WINDOW_SIZE; ++i) {
         /* Get the source symbol in order in the window */
-        uint8_t sourceBufferIndex = (encodingSymbolID - RLC_WINDOW_SIZE + i) % RLC_BUFFER_SIZE;
+        uint8_t sourceBufferIndex = (encodingSymbolID - RLC_WINDOW_SIZE + i + 1) % RLC_BUFFER_SIZE;
         struct sourceSymbol_t *sourceSymbol = &fecConvolution->sourceRingBuffer[sourceBufferIndex];
+        printf("Source symbol #%d with idx=%u at index %d=%x with coef=%u\n", i, sourceBufferIndex, sourceBufferIndex, sourceSymbol->packet[142], coefs[i]);
 
         /* Encode the source symbol in the packet */
-        symbol_add_scaled(repairSymbol->packet, coefs[i], sourceSymbol, max_length, rlc->muls);
+        symbol_add_scaled(repairSymbol->packet, coefs[i], sourceSymbol->packet, MAX_PACKET_SIZE, rlc->muls);
     }
 
     /* Now add and complete the TLV */
@@ -56,6 +61,10 @@ static int rlc__generateRepairSymbols(fecConvolution_t *fecConvolution, encode_r
 
     /* And finally the length of the repair symbol is the maximum length */
     repairSymbol->packet_length = max_length;
+
+    /*for (int l = 0; l < MAX_PACKET_SIZE; ++l) {
+        printf("Repair symbol after encoding at index %d=%x\n", l, repairSymbol->packet[l]);
+    }*/
 
     free(coefs);
     

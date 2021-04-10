@@ -182,8 +182,7 @@ static __always_inline int decodingRepairXOR_on_the_line(struct __sk_buff *skb, 
     }
 
     /* The payload contains the repair symbol, but also the transport header which must be skipped
-     * By construction, this transport header is a simple UDP transport header
-     */
+     * By construction, this transport header is a simple UDP transport header */
     if (payload_pointer + 8 > data_end) {
         if (DEBUG) bpf_printk("Receiver: cannot get passed the transport header\n");
         return -1;
@@ -198,8 +197,7 @@ static __always_inline int decodingRepairXOR_on_the_line(struct __sk_buff *skb, 
     }
 
     /* We use a small trick here. We cannot use the repairSymbol to store the repair symbol of the packet
-     * because it may contain already decoded information. So we store it in sourceSymbol_t structure
-     */
+     * because it may contain already decoded information. So we store it in sourceSymbol_t structure */
     __u32 payload_offset = (long)payload_pointer - (long)data;
     const __u16 size = payload_len - 1;
     if (size < sizeof(sourceSymbol->packet) && payload_offset + size <= (long)data_end) {
@@ -461,10 +459,59 @@ static __always_inline int storePacket(struct __sk_buff *skb, struct sourceSymbo
     return 0;
 }
 
+static __always_inline int storeRepairSymbol(struct __sk_buff *skb, struct repairSymbol_t *repairSymbol, struct ip6_srh_t *srh) {
+    int err;
+
+    void *data = (void *)(long)skb->data;
+    void *data_end = (void *)(long)skb->data_end;
+
+    /* Get pointer to the payload of the packet */
+    void *payload_pointer = seg6_find_payload(skb, srh);
+    if (!payload_pointer) {
+        if (DEBUG) bpf_printk("Receiver: impossible to get a pointer to the repair symbol payload\n");
+        return -1;
+    }
+
+    /* The payload contains the repair symbol, but also the transport header which must be skipped
+     * By construction, this transport header is a simple UDP transport header */
+    if (payload_pointer + 8 > data_end) {
+        if (DEBUG) bpf_printk("Receiver: cannot get passed the transport header\n");
+        return -1;
+    }
+    payload_pointer += 8 * sizeof(char);
+
+    /* Get the packet payload length */
+    __u32 payload_len = ((long)data_end) - ((long)payload_pointer);
+    if (payload_pointer + payload_len > data_end) {
+        if (DEBUG) bpf_printk("Receiver: inconsistent payload\n");
+        return -1;
+    }
+
+    /* Store the payload in repairSymbol->packet */
+    __u32 payload_offset = (long)payload_pointer - (long)data;
+    const __u16 size = payload_len - 1;
+    if (size < sizeof(repairSymbol->packet) && payload_offset + size <= (long)data_end) {
+        err = bpf_skb_load_bytes(skb, payload_offset, (void *)repairSymbol->packet, (size & 0xffff) + 1);
+    } else {
+        if (DEBUG) bpf_printk("Receiver: Wrong offset\n");
+        return -1;
+    }
+    if (err < 0) {
+        if (DEBUG) bpf_printk("Receiver: impossible to load bytes\n");
+        return -1;
+    }
+
+    repairSymbol->packet_length = payload_len;
+
+    if (DEBUG) bpf_printk("Receiver: stored the repair symbol!\n");
+
+    return 0;
+}
+
 static __always_inline int try_to_recover_from_repair__convolution(struct __sk_buff *skb, fecConvolution_t *fecConvolution, window_info_t *window_info) {
     /* Analyze if we can recover from a lost packet
      * If we can, send the window alongside with the repair symbol(s) to user space */
-    if (window_info->received_ss < RLC_WINDOW_SIZE && window_info->received_rs > 0) {
+    if (1 || window_info->received_ss < RLC_WINDOW_SIZE && window_info->received_rs > 0) {
         // TODO: improve by not sending the entire structure !
         bpf_perf_event_output(skb, &events, BPF_F_CURRENT_CPU, fecConvolution, sizeof(fecConvolution_t));
     }
@@ -511,7 +558,8 @@ static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *sk
     struct sourceSymbol_t *sourceSymbol = &fecConvolution->sourceRingBuffer[ringBufferIndex & 0xff];
     // See if the packet is already in the buffer
     struct tlvSource__convo_t *tlv_ss = (struct tlvSource__convo_t *)&sourceSymbol->tlv;
-    if (tlv_ss->encodingSymbolID == encodingSymbolID) {
+    // Second condition to ensure that this is not the initialization
+    if (tlv_ss->encodingSymbolID == encodingSymbolID && tlv_ss->tlv_type != 0) {
         if (DEBUG) bpf_printk("Receiver: source symbol already in the buffer: %d %d\n", tlv_ss->encodingSymbolID, encodingSymbolID);
         return -1;
     }
@@ -583,9 +631,9 @@ static __always_inline int receiveRepairSymbol__convolution(struct __sk_buff *sk
     memset(repairSymbol, 0, sizeof(struct repairSymbol_t)); // Optimization ?
 
     /* Store repair symbol 'as a source symbol' */
-    err = storePacket(skb, (struct sourceSymbol_t *)repairSymbol);
+    err = storeRepairSymbol(skb, repairSymbol, srh);
     if (err < 0) {
-        if (DEBUG) bpf_printk("Receiver: error from storePacket confirmed\n");
+        if (DEBUG) bpf_printk("Receiver: error from storeRepairSymbol confirmed\n");
         return -1;
     } else if (err > 0) {
         if (DEBUG) bpf_printk("Receiver: confirmed packet too big for protection\n");

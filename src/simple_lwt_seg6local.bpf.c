@@ -31,8 +31,9 @@ struct {
 
 /* Perf even buffer */
 struct {
-    __uint(type, BPF_MAP_TYPE_RINGBUF);
-    __uint(max_entries, 4096 * 512);
+    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+    __uint(key_size, sizeof(__u32));
+    __uint(value_size, sizeof(__u32));
 } events SEC(".maps");
 
 static __always_inline int storePacket(struct __sk_buff *skb, struct sourceSymbol_t *sourceSymbol) {
@@ -374,7 +375,7 @@ static __always_inline int fecFramework__convolution(struct __sk_buff *skb, stru
      * Forward all data to user space for computation */
     if (ret) {
         bpf_printk("Send data to user space for repair symbol generation\n");
-        bpf_ringbuf_output(&events, fecConvolution, sizeof(fecConvolution_t), 0);
+        bpf_perf_event_output(skb, &events, BPF_F_CURRENT_CPU, fecConvolution, sizeof(fecConvolution_t));
     }
 
     /* Update encodingSymbolID: wraps to zero after 2^32 - 1 */

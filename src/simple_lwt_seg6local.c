@@ -181,7 +181,7 @@ static int send_repairSymbol_XOR(void *ctx, void *data, size_t data_sz) {
     //send_raw_socket(repairSymbol);
 }
 
-static int fecScheme(void *ctx, void *data, size_t data_sz) {
+static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
     fecConvolution_t *fecConvolution = (fecConvolution_t *)data;
     printf("Call triggered: %d\n", fecConvolution->encodingSymbolID);
 
@@ -192,43 +192,43 @@ static int fecScheme(void *ctx, void *data, size_t data_sz) {
     int err = rlc__generateRepairSymbols(fecConvolution, rlc);
     if (err < 0) {
         printf("ERROR. TODO: handle\n");
-        return -1;
+        return;
     }
 
     /* Send the repair symbol */
     send_raw_socket(rlc->repairSymbol);
-    return 0;
+    return;
 }
 
 static void handle_events(int map_fd_events) {
     /* Define structure for the perf event */
-    struct ring_buffer *rb = NULL;
+    struct perf_buffer_opts pb_opts = {
+        .sample_cb = fecScheme,
+    };
+    struct perf_buffer *pb = NULL;
     int err;
 
-    rb = ring_buffer__new(map_fd_events, fecScheme, NULL, NULL);
-    if (!rb) {
-        rb = NULL;
+    pb = perf_buffer__new(map_fd_events, 128, &pb_opts);
+    err = libbpf_get_error(pb);
+    if (err) {
+        pb = NULL;
         fprintf(stderr, "Impossible to open perf event\n");
         goto cleanup;
     }
 
-
     /* Enter in loop until a signal is retrieved
-     * Poll the notification from the BPF program means that we can
-     * retrieve information from a repairSymbol_t and send it to the decoder router
+     * Poll the recovered packet from the BPF program
      */
     while (!exiting) {
-        err = ring_buffer__poll(rb, 100);
+        err = perf_buffer__poll(pb, 100);
         if (err < 0 && errno != EINTR) {
             fprintf(stderr, "Error polling perf buffer: %d\n", err);
             goto cleanup;
         }
     }
 
-    printf("Total number of calls: %lu\n", total);
-
 cleanup:
-    ring_buffer__free(rb);
+    perf_buffer__free(pb);
 }
 
 int main(int argc, char *argv[]) {
@@ -335,8 +335,6 @@ int main(int argc, char *argv[]) {
 	}
 
 cleanup:
-    /* Free memory of the RLC structure */
-    free(rlc);
     // We reach this point when we Ctrl+C with signal handling
     /* Unpin the program and the maps to clean at exit */
     bpf_object__unpin_programs(skel->obj, "/sys/fs/bpf/simple_me");
@@ -345,5 +343,7 @@ cleanup:
     // Do not know if I have to unpin the perf event too
     bpf_map__unpin(map_events, "/sys/fs/bpf/simple_me/events");
     simple_lwt_seg6local_bpf__destroy(skel);
+    /* Free memory of the RLC structure */
+    free_rlc(rlc);
     return 0;
 }
