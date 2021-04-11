@@ -11,7 +11,7 @@
 #include "libseg6.c"
 #include "encoder.h"
 
-#define DEBUG 0
+#define DEBUG 1
 #define BPF_ERROR BPF_DROP  // Choose action when an error occurs in the process
 
 /* Map */
@@ -37,7 +37,6 @@ struct {
 } events SEC(".maps");
 
 static __always_inline int storePacket(struct __sk_buff *skb, struct sourceSymbol_t *sourceSymbol) {
-    if (DEBUG) bpf_printk("Sender: call storePacket");
 
     void *data = (void *)(long)skb->data;
     void *data_end = (void *)(long)skb->data_end;
@@ -71,7 +70,7 @@ static __always_inline int storePacket(struct __sk_buff *skb, struct sourceSymbo
     const __u16 size = packet_len - 1; // Small trick here because the verifier thinks the value can be negative
     if (size < sizeof(sourceSymbol->packet) && ipv6_offset + size <= (long)data_end) {
         // TODO: 0xffff should be set as global => ensures that the size is the max classic size of IPv6 packt
-        err = bpf_skb_load_bytes(skb, ipv6_offset, (void *)sourceSymbol->packet, (size & 0xffff) + 1);
+        err = bpf_skb_load_bytes(skb,    ipv6_offset, (void *)sourceSymbol->packet, (size & 0xffff) + 1);
     } else {
         if (DEBUG) bpf_printk("Sender: Wrong ipv6_offset\n");
         return -1;

@@ -11,7 +11,7 @@
 #include "libseg6_decoder.c"
 #include "decoder.h"
 
-#define DEBUG 1
+#define DEBUG 0
 
 typedef struct xorStruct {
     struct sourceSymbol_t sourceSymbol;
