@@ -211,7 +211,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc)
         //printf("id first rs=%u, encodingSymbolID=%u\n", id_first_rs_first_window, encodingSymbolID);
         uint32_t id_from_buffer = ((struct tlvSource__convo_t *)&fecConvolution->sourceRingBuffer[idx].tlv)->encodingSymbolID;
         uint32_t theoric_id = id_first_ss_first_window + i;
-        //printf("id buffer: %d, theoric id=%d\n", id_from_buffer, theoric_id);
+        printf("id buffer: %d, theoric id=%d\n", id_from_buffer, theoric_id);
         if (id_from_buffer == theoric_id) {
             source_symbols_array[i] = malloc(MAX_PACKET_SIZE);
             memset(source_symbols_array[i], 0, MAX_PACKET_SIZE);
@@ -219,12 +219,10 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc)
             /*for (int l = 0; l < 158; ++l) {
                 printf("Source symbol #%d at index %d=%x\n", i, l, source_symbols_array[i][l]);
             }*/
-        } else if (rlc->recoveredSources[idx]) {
-            if (rlc->recoveredSources[idx]->encodingSymbolID == theoric_id) {
-                source_symbols_array[i] = malloc(MAX_PACKET_SIZE);
-                memset(source_symbols_array[i], 0, MAX_PACKET_SIZE);
-                memcpy(source_symbols_array[i], rlc->recoveredSources[idx]->packet, MAX_PACKET_SIZE);
-            }
+        } else if (rlc->recoveredSources[idx] && rlc->recoveredSources[idx]->encodingSymbolID == theoric_id) {
+            source_symbols_array[i] = malloc(MAX_PACKET_SIZE);
+            memset(source_symbols_array[i], 0, MAX_PACKET_SIZE);
+            memcpy(source_symbols_array[i], rlc->recoveredSources[idx]->packet, MAX_PACKET_SIZE);
         } else {
             unknowns_idx[nb_unknowns] = i; // Store index of the lost packet (unknown for the equation system)
             missing_indexes[i] = nb_unknowns;
