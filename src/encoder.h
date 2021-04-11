@@ -11,14 +11,14 @@
 
 /* Structures */
 struct sourceSymbol_t {
-    __u16 packet_length;
     __u8 packet[MAX_PACKET_SIZE];
+    __u16 packet_length;
 };
 
 struct repairSymbol_t {
-    int packet_length;
     __u8 tlv[sizeof(struct tlvRepair__block_t)];
     __u8 packet[MAX_PACKET_SIZE];
+    __u16 packet_length;
 };
 
 typedef struct mapStruct {

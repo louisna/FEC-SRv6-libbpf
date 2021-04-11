@@ -43,14 +43,17 @@ static int rlc__generateRepairSymbols(fecConvolution_t *fecConvolution, encode_r
         max_length = sourceSymbol->packet_length > max_length ? sourceSymbol->packet_length : max_length;
     }
 
+    uint16_t coded_length = 0;
+
     for (uint8_t i = 0; i < RLC_WINDOW_SIZE; ++i) {
         /* Get the source symbol in order in the window */
         uint8_t sourceBufferIndex = (encodingSymbolID - RLC_WINDOW_SIZE + i + 1) % RLC_BUFFER_SIZE;
         struct sourceSymbol_t *sourceSymbol = &fecConvolution->sourceRingBuffer[sourceBufferIndex];
-        printf("Source symbol #%d with idx=%u at index %d=%x with coef=%u\n", i, sourceBufferIndex, sourceBufferIndex, sourceSymbol->packet[142], coefs[i]);
+        //printf("Source symbol #%d with idx=%u at index %d=%x with coef=%u\n", i, sourceBufferIndex, sourceBufferIndex, sourceSymbol->packet[142], coefs[i]);
 
         /* Encode the source symbol in the packet */
         symbol_add_scaled(repairSymbol->packet, coefs[i], sourceSymbol->packet, MAX_PACKET_SIZE, rlc->muls);
+        symbol_add_scaled(&coded_length, coefs[i], &sourceSymbol->packet_length, sizeof(uint16_t), rlc->muls);
     }
 
     /* Now add and complete the TLV */
@@ -58,9 +61,9 @@ static int rlc__generateRepairSymbols(fecConvolution_t *fecConvolution, encode_r
 
     /* Also add the remaining parameter */
     struct tlvRepair__convo_t *tlv = (struct tlvRepair__convo_t *)&repairSymbol->tlv;
-    tlv->payload_len = max_length; // TODO: Should be set to the coding of each payload length !
+    tlv->coded_payload_len = coded_length; // Get the coded length here
 
-    /* And finally the length of the repair symbol is the maximum length */
+    /* And finally the length of the repair symbol is the maximum length instead of the coded length */
     repairSymbol->packet_length = max_length;
 
     /*for (int l = 0; l < MAX_PACKET_SIZE; ++l) {

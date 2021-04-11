@@ -137,9 +137,9 @@ int send_raw_socket_recovered(const recoveredSource_t *repairSymbol) {
 
     /* Copy the content of the repairSymbol_t packet inside the local packet variable.
      * => we are given a const variable, but we will need to change some fields */
-    memcpy(packet, repairSymbol->packet, MAX_PACKET_SIZE);
-    packet_length = MAX_PACKET_SIZE;
-
+    memcpy(packet, repairSymbol->packet, repairSymbol->packet_length);
+    packet_length = repairSymbol->packet_length;
+    printf("Packet recovered of length: %ld\n", packet_length);
     
     /* Get pointer to the IPv6 header and Segment Routing header */
     iphdr = (struct ip6_hdr *)&packet[0];
@@ -235,7 +235,7 @@ static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
     fecConvolution_t *fecConvolution = (fecConvolution_t *)data;
     printf("Call triggered: %d\n", fecConvolution->encodingSymbolID);
 
-    debug_print(fecConvolution);
+    //debug_print(fecConvolution);
 
     /* Generate the repair symbol */
     int err = rlc__fec_recover(fecConvolution, rlc);

@@ -147,9 +147,9 @@ void gaussElimination(int n_eq, int n_unknowns, uint8_t **a, uint8_t *constant_t
 }
 
 static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc) {
-    uint16_t max_length = 0;
     // ID of the last received repair symbol
     uint32_t encodingSymbolID = fecConvolution->encodingSymbolID;
+    uint32_t decoding_size = MAX_PACKET_SIZE + sizeof(uint16_t); // Decoding the packet + packet length
     
     tinymt32_t prng;
     prng.mat1 = 0x8f7011ee;
@@ -211,18 +211,20 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc)
         //printf("id first rs=%u, encodingSymbolID=%u\n", id_first_rs_first_window, encodingSymbolID);
         uint32_t id_from_buffer = ((struct tlvSource__convo_t *)&fecConvolution->sourceRingBuffer[idx].tlv)->encodingSymbolID;
         uint32_t theoric_id = id_first_ss_first_window + i;
-        printf("id buffer: %d, theoric id=%d\n", id_from_buffer, theoric_id);
+        //printf("id buffer: %d, theoric id=%d\n", id_from_buffer, theoric_id);
         if (id_from_buffer == theoric_id) {
-            source_symbols_array[i] = malloc(MAX_PACKET_SIZE);
-            memset(source_symbols_array[i], 0, MAX_PACKET_SIZE);
+            source_symbols_array[i] = malloc(decoding_size);
+            memset(source_symbols_array[i], 0, decoding_size);
             memcpy(source_symbols_array[i], fecConvolution->sourceRingBuffer[idx].packet, MAX_PACKET_SIZE);
+            memcpy(source_symbols_array[i] + MAX_PACKET_SIZE, &fecConvolution->sourceRingBuffer[idx].packet_length, sizeof(uint16_t));
             /*for (int l = 0; l < 158; ++l) {
                 printf("Source symbol #%d at index %d=%x\n", i, l, source_symbols_array[i][l]);
             }*/
         } else if (rlc->recoveredSources[idx] && rlc->recoveredSources[idx]->encodingSymbolID == theoric_id) {
             source_symbols_array[i] = malloc(MAX_PACKET_SIZE);
-            memset(source_symbols_array[i], 0, MAX_PACKET_SIZE);
+            memset(source_symbols_array[i], 0, decoding_size);
             memcpy(source_symbols_array[i], rlc->recoveredSources[idx]->packet, MAX_PACKET_SIZE);
+            memcpy(source_symbols_array[i] + MAX_PACKET_SIZE, &rlc->recoveredSources[idx]->packet_length, sizeof(uint16_t));
         } else {
             unknowns_idx[nb_unknowns] = i; // Store index of the lost packet (unknown for the equation system)
             missing_indexes[i] = nb_unknowns;
@@ -268,8 +270,8 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc)
     }
 
     for (int j = 0; j < nb_unknowns; ++j) {
-        unknowns[j] = malloc(MAX_PACKET_SIZE);
-        memset(unknowns[j], 0, MAX_PACKET_SIZE);
+        unknowns[j] = malloc(decoding_size);
+        memset(unknowns[j], 0, decoding_size);
     }
 
     int i = 0;
@@ -302,16 +304,19 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc)
         }
         //printf("protects at least one ? %d\n", protect_at_least_one_ss);
         if (protect_at_least_one_ss) {
-            constant_terms[i] = malloc(MAX_PACKET_SIZE);
+            constant_terms[i] = malloc(decoding_size);
             if (!constant_terms[i]) return -1;
+
+            struct tlvRepair__convo_t *repair_tlv = (struct tlvRepair__convo_t *)&repairSymbol->tlv;
         
-            memset(constant_terms[i], 0, MAX_PACKET_SIZE);
+            memset(constant_terms[i], 0, decoding_size);
             memcpy(constant_terms[i], repairSymbol->packet, MAX_PACKET_SIZE);
+            memcpy(constant_terms[i] + MAX_PACKET_SIZE, &repair_tlv->coded_payload_len, sizeof(uint16_t));
             memset(system_coefs[i], 0, nb_unknowns);
             uint16_t repairKey = ((struct tlvRepair__convo_t *)&repairSymbol->tlv)->repairFecInfo;
             rlc__get_coefs(&prng, repairKey, RLC_WINDOW_SIZE, coefs); // TODO: coefs specific ? line 454
             //printf("repairKey is %d venant de %x\n", repairKey, ((struct tlvRepair__convo_t *)&repairSymbol->tlv)->repairFecInfo);
-            struct tlvRepair__convo_t *tlv = ((struct tlvRepair__convo_t *)&repairSymbol->tlv);
+            //struct tlvRepair__convo_t *tlv = ((struct tlvRepair__convo_t *)&repairSymbol->tlv);
             //printf("Est-ce que j'ai bien le repair tlv ? tlv_type=%d, tlv_encoding=%d, fecInfo=%d\n", tlv->tlv_type, tlv->encodingSymbolID, tlv->repairFecInfo);
             /*for (int jj = 0; jj < RLC_WINDOW_SIZE; ++jj) {
                 printf("Valeur du coef: %d\n", coefs[jj]);
@@ -321,7 +326,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc)
                 int idx = rs * RLC_WINDOW_SLIDE + j;
                 if (source_symbols_array[idx]) { // This protected source symbol is received
                 //printf("Source symbol #%d at index %d=%x with coef=%d\n", j, j, source_symbols_array[idx][142], coefs[j]);
-                    symbol_sub_scaled(constant_terms[i], coefs[j], source_symbols_array[idx], MAX_PACKET_SIZE, muls);
+                    symbol_sub_scaled(constant_terms[i], coefs[j], source_symbols_array[idx], decoding_size, muls);
                 } else if (current_unknown < nb_unknowns) {
                     if (missing_indexes[idx] != -1) {
                         system_coefs[i][missing_indexes[idx]] = coefs[j];
@@ -340,7 +345,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc)
     bool can_recover = n_effective_equations >= nb_unknowns;
     //printf("neffe eq=%d, nb_unknown=%d\n", n_effective_equations, nb_unknowns);
     if (can_recover) {
-        gaussElimination(n_effective_equations, nb_unknowns, system_coefs, constant_terms, unknowns, undetermined, MAX_PACKET_SIZE, muls, rlc->table_inv);
+        gaussElimination(n_effective_equations, nb_unknowns, system_coefs, constant_terms, unknowns, undetermined, decoding_size, muls, rlc->table_inv);
     } else {
         printf("Cannot recover\n");
     }
@@ -354,6 +359,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc)
             memset(recovered, 0, sizeof(recoveredSource_t));
             recovered->encodingSymbolID = id_first_ss_first_window + idx;
             memcpy(recovered->packet, unknowns[current_unknown], MAX_PACKET_SIZE);
+            memcpy(&recovered->packet_length, unknowns[current_unknown] + MAX_PACKET_SIZE, 2);
 
             /* Add the recovered packet in the recovered buffer */
             int bufferIdx = recovered->encodingSymbolID % RLC_RECEIVER_BUFFER_SIZE;

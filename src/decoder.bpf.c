@@ -538,7 +538,10 @@ static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *sk
 
     /* Get information about the source symbol */
     __u32 encodingSymbolID = tlv.encodingSymbolID;
-    if (encodingSymbolID < 0) return -1;
+    if (encodingSymbolID < 0) {
+        bpf_printk("LOL ?\n");
+        return -1;
+        }
 
     /* Get pointer to global stucture */
     fecConvolution_t *fecConvolution = bpf_map_lookup_elem(&fecConvolutionInfoMap, &k);
@@ -608,7 +611,10 @@ static __always_inline int receiveRepairSymbol__convolution(struct __sk_buff *sk
 
     /* Get information about the source symbol */
     __u32 encodingSymbolID = tlv.encodingSymbolID;
-    if (encodingSymbolID < 0) return -1; // Lol
+    if (encodingSymbolID < 0) {
+        bpf_printk("Double lol ?\n");
+        return -1; // Lol
+    }
 
     /* Get pointer to global stucture */
     fecConvolution_t *fecConvolution = bpf_map_lookup_elem(&fecConvolutionInfoMap, &k);

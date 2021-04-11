@@ -50,6 +50,7 @@ typedef struct {
 
 typedef struct {
     __u32 encodingSymbolID;
+    __u16 packet_length;
     __u8 packet[MAX_PACKET_SIZE];
 } recoveredSource_t;
 

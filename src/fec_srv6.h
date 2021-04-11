@@ -38,7 +38,7 @@ struct tlvRepair__convo_t {
     __u8 len;
     __u32 encodingSymbolID;
     __u32 repairFecInfo; // TODO: split ?
-    __u16 payload_len;
+    __u16 coded_payload_len;
     __u8 nss;
     __u8 nrs;
     __u16 padding;
