@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include "../prng/tinymt32.c"
 #include "../gf256/swif_symbol.c"
+#include "../encoder.h"
 
 typedef encode_rlc_t;
 

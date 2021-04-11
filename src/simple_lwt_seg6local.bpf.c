@@ -327,20 +327,21 @@ static __always_inline int fecScheme__convoRLC(struct __sk_buff *skb, fecConvolu
 
     /* Compute the repair symbol if needed */
     if (ringBuffSize == RLC_WINDOW_SIZE) {
+        ++repairKey;
         /* Start to complete the TLV for the repair symbol. The remaining will be done in US */
         struct tlvRepair__convo_t *repairTlv = (struct tlvRepair__convo_t *)&fecConvolution->repairTlv;
         // memset(repairTlv, 0, sizeof(tlvRepair__convo_t));
         repairTlv->tlv_type = TLV_CODING_REPAIR; // TODO: change also ?
         repairTlv->len = sizeof(struct tlvRepair__convo_t) - 2;
         repairTlv->encodingSymbolID = encodingSymbolID; // Set to the value of the last source symbol of the window
-        repairTlv->repairFecInfo = (0 << 20) + (repairKey << 4) + 0;
+        repairTlv->repairFecInfo = (0 << 24) + repairKey;
         // repairTlv->payload_len = 0; // TODO: compute the coded length 
         repairTlv->nss = RLC_WINDOW_SIZE;
         repairTlv->nrs = 1;
 
         /* Reset parameters for the next window */
         fecConvolution->ringBuffSize = ringBuffSize - RLC_WINDOW_SLIDE; // For next window, already some symbols
-        fecConvolution->repairKey = repairKey + 1; // Increment the repair key seed
+        fecConvolution->repairKey = repairKey; // Increment the repair key seed
 
         /* Indicate to the FEC Framework that a repair symbol has been generated */
         return 1;
@@ -374,7 +375,7 @@ static __always_inline int fecFramework__convolution(struct __sk_buff *skb, stru
     /* A repair symbol must be generated
      * Forward all data to user space for computation */
     if (ret) {
-        bpf_printk("Send data to user space for repair symbol generation\n");
+        //bpf_printk("Send data to user space for repair symbol generation\n");
         bpf_perf_event_output(skb, &events, BPF_F_CURRENT_CPU, fecConvolution, sizeof(fecConvolution_t));
     }
 

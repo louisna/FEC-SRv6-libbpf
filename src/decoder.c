@@ -93,7 +93,7 @@ int send_raw_socket(const struct repairSymbol_t *repairSymbol) {
         return -1; // TODO: maybe just use the last segment instead ?
     }
     next_segment_idx = i - 1;
-    printf("Value of next_segment_idx: %d\n", next_segment_idx);
+    //printf("Value of next_segment_idx: %d\n", next_segment_idx);
 
     /* Copy the address of the next segment in the Destination Address entry of the IPv6 header */
     memset(&dst, 0, sizeof(dst));
@@ -136,8 +136,7 @@ int send_raw_socket_recovered(const recoveredSource_t *repairSymbol) {
     }
 
     /* Copy the content of the repairSymbol_t packet inside the local packet variable.
-     * => we are given a const variable, but we will need to change some fields
-     */
+     * => we are given a const variable, but we will need to change some fields */
     memcpy(packet, repairSymbol->packet, MAX_PACKET_SIZE);
     packet_length = MAX_PACKET_SIZE;
 
@@ -151,8 +150,7 @@ int send_raw_socket_recovered(const recoveredSource_t *repairSymbol) {
     iphdr->ip6_hops = 51;
 
     /* Retrieve the next segment after the current node to put as destination address.
-     * Also need to update the Segment Routing header segment left entry
-     */
+     * Also need to update the Segment Routing header segment left entry */
     bool found_current_segment;
     for (i = srh->first_segment; i >= 0; --i) {
         found_current_segment = 1;

@@ -1,3 +1,6 @@
+#ifndef ENCODER_STRUCT_H
+#define ENCODER_STRUCT_H
+
 #include "fec_srv6.h"
 
 #define BPF_ERROR BPF_DROP
@@ -38,3 +41,5 @@ typedef struct {
     __u8 *muls;
     struct repairSymbol_t *repairSymbol;
 } encode_rlc_t;
+
+#endif

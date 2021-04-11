@@ -427,7 +427,7 @@ static __always_inline int storePacket(struct __sk_buff *skb, struct sourceSymbo
         return -1;
     }
 
-    if (DEBUG) bpf_printk("Receiver: Done storing of packet with big size ! %d\n", packet_len);
+    bpf_printk("Receiver: Done storing of packet with big size ! %d\n", packet_len);
 
     /* Store the length of the packet that will also be coded */
     sourceSymbol->packet_length = packet_len;
@@ -579,7 +579,7 @@ static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *sk
     /* Copy the TLV for later use */
     memcpy(&sourceSymbol->tlv, &tlv, sizeof(struct tlvSource__convo_t));
 
-    bpf_printk("Receiver: stored source symbol: %d %d!\n", sourceSymbol->packet_length, encodingSymbolID);
+    //bpf_printk("Receiver: stored source symbol: %d %d!\n", sourceSymbol->packet_length, encodingSymbolID);
 
     /* Indicate to all window information structures in the neighboorhood of the 
      * source symbol that it has been processed. As the repair symbol encodingSymbolID is the value
@@ -648,7 +648,7 @@ static __always_inline int receiveRepairSymbol__convolution(struct __sk_buff *sk
     /* Copy the TLV for later use */
     memcpy(&repairSymbol->tlv, &tlv, sizeof(struct tlvRepair__convo_t));
 
-    bpf_printk("Receiver: stored repair symbol: %d %d\n", repairSymbol->packet_length, encodingSymbolID);
+    //bpf_printk("Receiver: stored repair symbol: %d %d et repairFECinfo=%u\n", repairSymbol->packet_length, encodingSymbolID, tlv.repairFecInfo);
 
     /* Iterate over sourceRingBuffer to get information about possible reparation */
     for (__u8 i = 0; i < RLC_WINDOW_SIZE; ++i) {
