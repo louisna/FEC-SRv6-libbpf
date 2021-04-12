@@ -3,8 +3,6 @@
 #include "../gf256/swif_symbol.c"
 #include "../encoder.h"
 
-typedef encode_rlc_t;
-
 static void rlc__get_coefs(tinymt32_t *prng, uint32_t seed, int n, uint8_t coefs[n]) {
     tinymt32_init(prng, seed);
     int i;

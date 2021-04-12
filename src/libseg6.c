@@ -1,3 +1,6 @@
+#ifndef LIBSEG6_H_
+#define LIBSEG6_H_
+
 #ifndef VMLINUX_H_
 #define VMLINUX_H_
 #include <linux/bpf.h>
@@ -6,8 +9,8 @@
 #define BPF_HELPERS_H_
 #include <bpf/bpf_helpers.h>
 #endif
-#include "proto.h"
-#include "all.h"
+#include "headers/proto.h"
+#include "headers/all.h"
 
 #define TLV_ITERATIONS 16
 
@@ -371,3 +374,5 @@ static inline struct ip6_t *seg6_get_ipv6(struct __sk_buff *skb)
 
 	return ip;
 }
+
+#endif

@@ -12,7 +12,7 @@
 #include <bpf/bpf.h>
 #include "decoder.h"
 // #include "fec/fec.c"
-#include "fec_scheme/rlc_gf256_decode.c"
+#include "fec_scheme/window_rlc_gf256/rlc_gf256_decode.c"
 
 #include <arpa/inet.h>
 #include <netinet/ip6.h>

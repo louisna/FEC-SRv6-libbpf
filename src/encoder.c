@@ -8,16 +8,11 @@
 #include <sys/resource.h>
 #include <errno.h>
 #include <bpf/libbpf.h>
-#include "simple_lwt_seg6local.skel.h"
+#include "encoder.skel.h"
 #include <bpf/bpf.h>
 #include "encoder.h"
-#include "fec_scheme/rlc_gf256.c"
-
-#include <arpa/inet.h>
-#include <netinet/ip6.h>
-#include <netinet/ip.h>
-#include <netinet/udp.h>
-#include <linux/seg6.h>
+#include "fec_scheme/window_rlc_gf256/rlc_gf256.c"
+#include "raw_socket_sender.c"
 
 static volatile int sfd = -1;
 static volatile int first_sfd = 1;
@@ -27,122 +22,6 @@ static struct sockaddr_in6 src;
 static struct sockaddr_in6 dst;
 
 encode_rlc_t *rlc = NULL;
-
-/* From https://github.com/gih900/IPv6--DNS-Frag-Test-Rig/blob/master/dns-server-frag.c */
-uint16_t udp_checksum(const void *buff, size_t len, struct in6_addr *src_addr, struct in6_addr *dest_addr) {
-    const uint16_t *buf = buff;
-    uint16_t *ip_src = (void *)src_addr, *ip_dst = (void *)dest_addr;
-    uint32_t sum;
-    size_t length = len;
-    int i;
-
-    /* Calculate the sum */
-    sum = 0;
-    while (len > 1) {
-        sum += *buf++;
-        if (sum & 0x80000000)
-            sum = (sum & 0xFFFF) + (sum >> 16);
-        len -= 2;
-    }
-    if ( len & 1 )
-    /* Add the padding if the packet length is odd */
-    sum += *((uint8_t *)buf);
-
-    /* Add the pseudo-header */
-    for (i = 0 ; i <= 7 ; ++i) 
-        sum += *(ip_src++);
-
-    for (i = 0 ; i <= 7 ; ++i) 
-        sum += *(ip_dst++);
-
-    sum += htons(IPPROTO_UDP);
-    sum += htons(length);
-
-    /* Add the carries */
-    while (sum >> 16)
-        sum = (sum & 0xFFFF) + (sum >> 16);
-
-    /* Return the one's complement of sum */
-    return((uint16_t)(~sum));
-}
-
-int send_raw_socket(const struct repairSymbol_t *repairSymbol) {
-    uint8_t packet[4200];
-    size_t packet_length;
-    struct ip6_hdr *iphdr;
-    struct ipv6_sr_hdr *srh;
-    struct udphdr *uhdr;
-    size_t ip6_length = 40;
-    size_t srh_length = 0;
-    size_t tlv_length = 0;
-    size_t udp_length = 8;
-    size_t pay_length = repairSymbol->packet_length;
-    int bytes; // Number of sent bytes
-
-    if (sfd < 0) {
-        fprintf(stderr, "The socket is not initialized\n");
-        return -1;
-    }
-
-    /* IPv6 header */
-    iphdr = (struct ip6_hdr *)&packet[0];
-    iphdr->ip6_flow = htonl((6 << 28) | (0 << 20) | 0);
-    iphdr->ip6_nxt  = 43; // Nxt hdr = Routing header
-    iphdr->ip6_hops = 44;
-    iphdr->ip6_plen = 0; // Changed later
-
-    /* IPv6 Source address */
-    bcopy(&src.sin6_addr, &(iphdr->ip6_src), 16);
-
-	/* IPv6 Destination address */
-	bcopy(&dst.sin6_addr, &(iphdr->ip6_dst), 16);
-
-    /* Segment Routing header */
-    srh = (struct ipv6_sr_hdr *)&packet[ip6_length];
-    srh_length = sizeof(struct ipv6_sr_hdr) + 16 + 16;
-    srh->nexthdr = 17; // UDP
-    srh->hdrlen = 4 + 2;
-    srh->type = 4;
-    srh->segments_left = 1;
-    srh->first_segment = 1;
-    srh->flags = 0;
-    srh->tag = 0;
-
-    bcopy(&src.sin6_addr, &(srh->segments[0]), 16);
-    bcopy(&dst.sin6_addr, &(srh->segments[1]), 16);
-
-    /* TLV */
-    tlv_length = sizeof(struct tlvRepair__block_t);
-    uint8_t *tlv_pointer = &packet[ip6_length + srh_length];
-    bcopy(&repairSymbol->tlv, tlv_pointer, tlv_length);
-
-    /* UDP header */
-	uhdr = (struct udphdr *)&packet[ip6_length + srh_length + tlv_length];
-	uhdr->uh_sport = htons(50);
-	uhdr->uh_dport = htons(50);
-	uhdr->uh_ulen  = htons(pay_length);
-	uhdr->uh_sum   = 0; // Checksum computed later
-
-    /* Payload */
-	bcopy(repairSymbol->packet, &packet[ip6_length + srh_length + tlv_length + udp_length], pay_length);
-
-    /* Compute packet length */
-    packet_length = ip6_length + srh_length + tlv_length + udp_length + pay_length;
-    iphdr->ip6_plen = htons(srh_length + tlv_length + udp_length + pay_length);
-
-    /* Compute the UDP checksum */
-    uhdr->uh_sum = udp_checksum(uhdr, udp_length + pay_length, &src.sin6_addr, &dst.sin6_addr);
-
-    /* Send packet */
-    bytes = sendto(sfd, packet, packet_length, 0, (struct sockaddr *)&dst, sizeof(dst));
-    //++total;
-    if (bytes != packet_length) {
-        perror("Impossible to send packet");
-        return -1;
-    }
-
-    return 0;
-}
 
 /* Used to detect the end of the program */
 static volatile bool exiting = 0;
@@ -167,18 +46,17 @@ static void bump_memlock_rlimit(void) {
 	}
 }
 
-static int send_repairSymbol_XOR(void *ctx, void *data, size_t data_sz) {
+static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz) {
     /* Get the repairSymbol
      * ->packet: the repair symbol
      * ->packet_length: the length of the repair symbol
      * ->tlv: the TLV to be added in the SRH header 
      */
-    //const struct repairSymbol_t *repairSymbol = (struct repairSymbol_t *)data;
+    const struct repairSymbol_t *repairSymbol = (struct repairSymbol_t *)data;
     if (total % 10000 == 0) printf("CALL TRIGGERED!\n");
 
     ++total;
-    return 0;
-    //send_raw_socket(repairSymbol);
+    send_raw_socket(sfd, repairSymbol, src, dst);
 }
 
 static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
@@ -196,7 +74,10 @@ static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
     }
 
     /* Send the repair symbol */
-    send_raw_socket(rlc->repairSymbol);
+    err = send_raw_socket(sfd, rlc->repairSymbol, src, dst);
+    if (err < 0) {
+        perror("Impossible to send packet");
+    }
     return;
 }
 
@@ -232,11 +113,11 @@ cleanup:
 }
 
 int main(int argc, char *argv[]) {
-    struct simple_lwt_seg6local_bpf *skel;
+    struct encoder_bpf *skel;
     int err;
 
     if (argc != 3) {
-        fprintf(stderr, "Usage: ./simple_lwt_seg6local <encoder_addr> <decoder_addr>");
+        fprintf(stderr, "Usage: ./encoder <encoder_addr> <decoder_addr>");
         return -1;
     }
 
@@ -267,22 +148,22 @@ int main(int argc, char *argv[]) {
     signal(SIGTERM, sig_handler);
 
     /* Open BPF application */
-    skel = simple_lwt_seg6local_bpf__open();
+    skel = encoder_bpf__open();
     if (!skel) {
         fprintf(stderr, "Failed to open BPF skeleton :(\n");
         return 1;
     }
 
     /* Load and verify BPF program */
-    err = simple_lwt_seg6local_bpf__load(skel);
+    err = encoder_bpf__load(skel);
     if (err) {
         fprintf(stderr, "Failed to verify and load BPF skeleton :(\n");
         goto cleanup;
     }
 
-    bpf_object__pin(skel->obj, "/sys/fs/bpf/simple_me");
+    bpf_object__pin(skel->obj, "/sys/fs/bpf/encoder");
 
-    char *cmd = "sudo ip -6 route add fc00::a encap seg6local action End.BPF endpoint fd /sys/fs/bpf/simple_me/lwt_seg6local section notify_ok dev enp0s3";
+    char *cmd = "sudo ip -6 route add fc00::a encap seg6local action End.BPF endpoint fd /sys/fs/bpf/encoder/lwt_seg6local section notify_ok dev enp0s3";
     printf("Command is %s\n", cmd);
     //system(cmd);
 
@@ -310,14 +191,6 @@ int main(int argc, char *argv[]) {
 		goto cleanup;
 	}
 
-    /*int optval;
-
-	int ret = setsockopt(sfd, IPPROTO_IPV6, IP_HDRINCL, &optval, sizeof(int));
-    if(ret != 0) {
-        printf("Error setting options %d\n", ret);
-        return -1;
-    }*/
-
     /* Initialize structure for RLC */
     rlc = initialize_rlc();
     if (!rlc) {
@@ -337,12 +210,12 @@ int main(int argc, char *argv[]) {
 cleanup:
     // We reach this point when we Ctrl+C with signal handling
     /* Unpin the program and the maps to clean at exit */
-    bpf_object__unpin_programs(skel->obj, "/sys/fs/bpf/simple_me");
-    bpf_map__unpin(map_fecBuffer, "/sys/fs/bpf/simple_me/fecBuffer");
-    bpf_map__unpin(map_fecConvolutionBuffer, "/sys/fs/bpf/simple_me/fecConvolutionInfoMap");
+    bpf_object__unpin_programs(skel->obj, "/sys/fs/bpf/encoder");
+    bpf_map__unpin(map_fecBuffer, "/sys/fs/bpf/encoder/fecBuffer");
+    bpf_map__unpin(map_fecConvolutionBuffer, "/sys/fs/bpf/encoder/fecConvolutionInfoMap");
     // Do not know if I have to unpin the perf event too
-    bpf_map__unpin(map_events, "/sys/fs/bpf/simple_me/events");
-    simple_lwt_seg6local_bpf__destroy(skel);
+    bpf_map__unpin(map_events, "/sys/fs/bpf/encoder/events");
+    encoder_bpf__destroy(skel);
     /* Free memory of the RLC structure */
     free_rlc(rlc);
     return 0;

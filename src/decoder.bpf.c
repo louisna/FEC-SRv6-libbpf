@@ -8,7 +8,7 @@
 #endif
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
-#include "libseg6_decoder.c"
+#include "libseg6.c"
 #include "decoder.h"
 
 #define DEBUG 0
@@ -384,7 +384,7 @@ static __always_inline int canDecode(xorStruct_t *xorStruct) {
     return canDecodeXOR(xorStruct);
 }
 
-static __always_inline int storePacket(struct __sk_buff *skb, struct sourceSymbol_t *sourceSymbol) {
+static __always_inline int storePacket_decode(struct __sk_buff *skb, struct sourceSymbol_t *sourceSymbol) {
     int err;
 
     void *data = (void *)(long)(skb->data);
@@ -570,7 +570,7 @@ static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *sk
     memset(sourceSymbol, 0, sizeof(struct sourceSymbol_t)); // Optimization ?
 
     /* Store source symbol */
-    err = storePacket(skb, sourceSymbol);
+    err = storePacket_decode(skb, sourceSymbol);
     if (err < 0) {
         if (DEBUG) bpf_printk("Receiver: error from storePacket confirmed\n");
         return -1;
