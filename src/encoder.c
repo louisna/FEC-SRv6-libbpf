@@ -54,6 +54,7 @@ static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz)
      */
     const struct repairSymbol_t *repairSymbol = (struct repairSymbol_t *)data;
     if (total % 10000 == 0) printf("CALL TRIGGERED!\n");
+    printf("Information sur mon repair symbol: %u %u\n", repairSymbol->packet_length, repairSymbol->tlv[0]);
 
     ++total;
     send_raw_socket(sfd, repairSymbol, src, dst);
@@ -85,6 +86,7 @@ static void handle_events(int map_fd_events) {
     /* Define structure for the perf event */
     struct perf_buffer_opts pb_opts = {
         .sample_cb = fecScheme,
+        //.sample_cb = send_repairSymbol_XOR,
     };
     struct perf_buffer *pb = NULL;
     int err;

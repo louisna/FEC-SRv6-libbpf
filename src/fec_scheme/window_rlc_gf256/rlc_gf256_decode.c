@@ -146,7 +146,7 @@ void gaussElimination(int n_eq, int n_unknowns, uint8_t **a, uint8_t *constant_t
     }
 }
 
-static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc) {
+static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc, int sfd, struct sockaddr_in6 local_addr) {
     // ID of the last received repair symbol
     uint32_t encodingSymbolID = fecConvolution->encodingSymbolID;
     uint32_t decoding_size = MAX_PACKET_SIZE + sizeof(uint16_t); // Decoding the packet + packet length
@@ -368,7 +368,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc)
             // TODO: get the length also
             // TODO: send the packet
             print_recovered(recovered);
-            send_raw_socket_recovered(recovered);
+            send_raw_socket_recovered(sfd, recovered, local_addr);
             
         }
         free(unknowns[current_unknown++]);

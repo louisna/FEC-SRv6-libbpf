@@ -4,6 +4,7 @@
 #include "fec_srv6.h"
 
 #define BPF_ERROR BPF_DROP  // Choose action when an error occurs in the process
+#define DEBUG 1
 
 #define MAX_BLOCK 5  // Number of blocks we can simultaneously store
 #define MAX_SOURCE_SYMBOLS 25  // Number of source symbols per block
@@ -32,6 +33,12 @@ struct sourceBlock_t {
     __u8 nss;
     __u8 nrs;
 };
+
+typedef struct xorStruct {
+    struct sourceSymbol_t sourceSymbol;
+    struct repairSymbol_t repairSymbols;
+    struct sourceBlock_t sourceBlocks;
+} xorStruct_t;
 
 typedef struct {
     struct repairSymbol_t repairSymbol;

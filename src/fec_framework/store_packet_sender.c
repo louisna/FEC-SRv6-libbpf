@@ -1,3 +1,6 @@
+#ifndef STORE_PACKET_SENDER_H_
+#define STORE_PACKET_SENDER_H_
+
 #ifndef VMLINUX_H_
 #define VMLINUX_H_
 #include <linux/bpf.h>
@@ -8,8 +11,8 @@
 #include <bpf/bpf_helpers.h>
 #endif
 
-#include "../../libseg6.c"
-#include "../../encoder.h"
+#include "../libseg6.c"
+#include "../encoder.h"
 
 static __always_inline int storePacket(struct __sk_buff *skb, struct sourceSymbol_t *sourceSymbol) {
 
@@ -82,3 +85,5 @@ static __always_inline int storePacket(struct __sk_buff *skb, struct sourceSymbo
     if (DEBUG) bpf_printk("Sender: storePacket done");
     return 0;
 }
+
+#endif

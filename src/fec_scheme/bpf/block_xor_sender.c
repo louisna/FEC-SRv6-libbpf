@@ -11,11 +11,13 @@
 #include "../../libseg6.c"
 #include "../../encoder.h"
 
+#define MAX(a, b) a > b ? a : b
+
 static __always_inline int xor_on_the_line(struct __sk_buff *skb, struct repairSymbol_t *repairSymbol, struct sourceSymbol_t *sourceSymbol) {
     if (DEBUG) bpf_printk("Sender: XOR on the line\n");
 
     /* XOR is done by batch of 8 bytes */
-    __u64 *source_8 = (__u64 *)sourceSymbol->packet;
+    __u64 *source_8 = (__u64 *)sourceSymbol->packet;  
     __u64 *repair_8 = (__u64 *)repairSymbol->packet;
 
     /* XOR computation */
@@ -27,6 +29,9 @@ static __always_inline int xor_on_the_line(struct __sk_buff *skb, struct repairS
     /* Also compute the XOR of the length of the packets that will be stored in the repair TLV */
     struct tlvRepair__block_t *repair_tlv = (struct tlvRepair__block_t *)&repairSymbol->tlv;
     repair_tlv->payload_len ^= sourceSymbol->packet_length;
+
+    /* Get the maximum length of the source symbols as the length of the repair symbol */
+    repairSymbol->packet_length = MAX(repairSymbol->packet_length, sourceSymbol->packet_length); 
 
     return 0;
 }
@@ -47,16 +52,6 @@ static __always_inline int fecScheme__blockXOR(struct __sk_buff *skb, mapStruct_
     /* Reset the repair symbol from previous block if this is new block */
     if (sourceSymbolCount == 0) {
         memset(repairSymbol, 0, sizeof(struct repairSymbol_t));
-    }
-
-    /* Store source symbol */
-    err = storePacket(skb, sourceSymbol);
-    if (err < 0) {
-        if (DEBUG) bpf_printk("Sender: error confirmed from storePacket\n");
-        return -1;
-    } else if (err == 1) { // Cannot protect the packet because too big size
-        if (DEBUG) bpf_printk("Sender: too big packet confirmed\n");
-        return -1;
     }
 
     /* Perform XOR on the line */

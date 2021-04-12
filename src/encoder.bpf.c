@@ -35,12 +35,12 @@ int srv6_fec_encode(struct __sk_buff *skb)
         return BPF_ERROR;
     }
 
-    /* Get pointer to structure of the plugin
-    mapStruct_t *mapStruct = bpf_map_lookup_elem(&fecBuffer, &k);
+    /* Get pointer to structure of the plugin */
+    /*mapStruct_t *mapStruct = bpf_map_lookup_elem(&fecBuffer, &k);
     if (!mapStruct) {
         if (DEBUG) bpf_printk("Sender: impossible to get global pointer\n");
         return BPF_ERROR;
-    } */
+    }*/
 
     /* Create TLV structure and call FEC Framework
     struct tlvSource__block_t tlv;
@@ -55,6 +55,7 @@ int srv6_fec_encode(struct __sk_buff *skb)
 
     struct tlvSource__convo_t tlv;
     err = fecFramework__convolution(skb, &tlv, fecConvolution, &events);
+    //err = fecFramework__block(skb, &tlv, mapStruct, &events);
     if (err < 0) {
         if (DEBUG) bpf_printk("Sender: Error in FEC Framework\n");
         return BPF_ERROR;

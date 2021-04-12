@@ -10,6 +10,7 @@
 
 #include "../libseg6.c"
 #include "../encoder.h"
+#include "store_packet_sender.c"
 #include "../fec_scheme/bpf/block_xor_sender.c"
 
 struct {
@@ -19,10 +20,12 @@ struct {
     __type(value, mapStruct_t);
 } fecBuffer SEC(".maps");
 
-static __always_inline int fecFramework__block(struct __sk_buff *skb, struct tlvSource__block_t *csh, mapStruct_t *mapStruct, void *map) {
+static __always_inline int fecFramework__block(struct __sk_buff *skb, void *csh_void, mapStruct_t *mapStruct, void *map) {
     int err;
     __u16 sourceBlock = mapStruct->soubleBlock; 
     __u16 sourceSymbolCount = mapStruct->sourceSymbolCount;
+
+    struct tlvSource__block_t *csh = (struct tlvSource__block_t *)csh_void;
     
     /* Complete the source symbol TLV */
     memset(csh, 0, sizeof(struct tlvSource__block_t));
@@ -30,6 +33,19 @@ static __always_inline int fecFramework__block(struct __sk_buff *skb, struct tlv
     csh->len = sizeof(struct tlvSource__block_t) - 2; // Does not include tlv_type and len
     csh->sourceBlockNb = sourceBlock;
     csh->sourceSymbolNb = sourceSymbolCount;
+
+    /* Load the source symbol structure to store the packet */
+    struct sourceSymbol_t *sourceSymbol = &mapStruct->sourceSymbol;
+
+    /* Store source symbol */
+    err = storePacket(skb, sourceSymbol);
+    if (err < 0) {
+        if (DEBUG) bpf_printk("Sender: error confirmed from storePacket\n");
+        return -1;
+    } else if (err == 1) { // Cannot protect the packet because too big size
+        if (DEBUG) bpf_printk("Sender: too big packet confirmed\n");
+        return -1;
+    }
 
     /* Call coding function. This function:
      * 1) Stores the source symbol for coding (or directly codes if XOR-on-the-line)
