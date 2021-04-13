@@ -23,6 +23,10 @@ encoder_res = [
     2681295,  # Plugin without userspace witout add tlv without
 ]
 
+encode_rlc = [
+    3192260,  # Received by kernel counting also dropped
+]
+
 encoder_test_name = [
     "Full plugin v0",
     "Full plugin",

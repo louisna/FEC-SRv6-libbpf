@@ -62,7 +62,7 @@ static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz)
 
 static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
     fecConvolution_t *fecConvolution = (fecConvolution_t *)data;
-    printf("Call triggered: %d\n", fecConvolution->encodingSymbolID);
+    // printf("Call triggered: %d\n", fecConvolution->encodingSymbolID);
 
     /* Reset the content of the repair symbol from previous call */
     memset(rlc->repairSymbol, 0, sizeof(struct repairSymbol_t));

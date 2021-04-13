@@ -27,10 +27,10 @@ static int rlc__generateRepairSymbols(fecConvolution_t *fecConvolution, encode_r
     if (!coefs) return -1;
 
     rlc__get_coefs(&prng, fecConvolution->repairKey, RLC_WINDOW_SIZE, coefs);
-    printf("repairKey is %d\n", fecConvolution->repairKey);
-    for (int jj = 0; jj < RLC_WINDOW_SIZE; ++jj) {
+    //printf("repairKey is %d\n", fecConvolution->repairKey);
+    /*for (int jj = 0; jj < RLC_WINDOW_SIZE; ++jj) {
         printf("Valeur du coef: %d\n", coefs[jj]);
-    }
+    }*/
 
     for (uint8_t i = 0; i < RLC_WINDOW_SIZE; ++i) {
         /* Get the source symbol in order in the window */
