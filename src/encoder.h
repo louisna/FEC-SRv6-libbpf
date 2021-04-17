@@ -6,9 +6,7 @@
 #define BPF_ERROR BPF_DROP
 #define DEBUG 0
 
-#define RLC_BUFFER_SIZE 4
-#define RLC_WINDOW_SIZE 4
-#define RLC_WINDOW_SLIDE 2
+#define RLC_BUFFER_SIZE MAX_RLC_WINDOW_SIZE
 
 /* Structures */
 struct sourceSymbol_t {
@@ -36,6 +34,8 @@ typedef struct fecConvolution {
     __u8 ringBuffSize; // Number of packets for next coding in the ring buffer
     struct sourceSymbol_t sourceRingBuffer[RLC_BUFFER_SIZE];
     struct tlvRepair__convo_t repairTlv;
+    __u8 currentWindowSize;
+    __u8 currentWindowSlide;
 } fecConvolution_t;
 
 typedef struct {

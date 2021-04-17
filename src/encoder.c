@@ -76,6 +76,7 @@ static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
 
     /* Send the repair symbol */
     err = send_raw_socket(sfd, rlc->repairSymbol, src, dst);
+    //printf("%d", err);
     if (err < 0) {
         perror("Impossible to send packet");
     }
@@ -171,6 +172,8 @@ int main(int argc, char *argv[]) {
 
     int k0 = 0;
 
+    // TODO: getopt for parameters !
+
     /* Get file descriptor of maps and init the value of the structures */
     struct bpf_map *map_fecBuffer = skel->maps.fecBuffer;
     int map_fd_fecBuffer = bpf_map__fd(map_fecBuffer);
@@ -179,8 +182,10 @@ int main(int argc, char *argv[]) {
 
     struct bpf_map *map_fecConvolutionBuffer = skel->maps.fecConvolutionInfoMap;
     int map_fd_fecConvolutionBuffer = bpf_map__fd(map_fecConvolutionBuffer);
-    fecConvolution_t convo_struct_zero = {};
-    bpf_map_update_elem(map_fd_fecConvolutionBuffer, &k0, &convo_struct_zero, BPF_ANY);
+    fecConvolution_t convo_init = {0};
+    convo_init.currentWindowSize = 4;
+    convo_init.currentWindowSlide = 2;
+    bpf_map_update_elem(map_fd_fecConvolutionBuffer, &k0, &convo_init, BPF_ANY);
 
 
     struct bpf_map *map_events = skel->maps.events;

@@ -11,10 +11,10 @@
 #include "../../libseg6.c"
 #include "../../decoder.h"
 
-static __always_inline int try_to_recover_from_repair__convoRLC(struct __sk_buff *skb, fecConvolution_t *fecConvolution, window_info_t *window_info) {
+static __always_inline int try_to_recover_from_repair__convoRLC(struct __sk_buff *skb, fecConvolution_t *fecConvolution, window_info_t *window_info, struct tlvRepair__convo_t *tlv) {
     /* Analyze if we can recover from a lost packet
      * If we can, send the window alongside with the repair symbol(s) to user space */
-    if (1 || window_info->received_ss < RLC_WINDOW_SIZE && window_info->received_rs > 0) {
+    if (1 || window_info->received_ss < tlv->nss && window_info->received_rs > 0) {
         // TODO: improve by not sending the entire structure !
         return 1;
     }

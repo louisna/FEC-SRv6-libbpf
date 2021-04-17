@@ -24,7 +24,7 @@ def craft_srv6_packet(args, payload) -> IPv6:
     pkt = pkt / srh
 
     # Transport layer
-    transport = UDP(sport=123, dport=456)
+    transport = UDP(sport=123, dport=4444)
     pkt = pkt / transport
 
     # Payload
@@ -71,9 +71,7 @@ def send_packets_from_file(args) -> None:
 
             if args.verbose:
                 print(f"Sending packet #{i}")
-    
-        if args.verbose:
-            print(f"Sent {nb_packets} packets !")
+        print(f"Sent {nb_packets} packets !")
 
 
 def main():

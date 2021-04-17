@@ -57,7 +57,7 @@ static __always_inline int storePacket_decode(struct __sk_buff *skb, struct sour
         return -1;
     }
 
-    bpf_printk("Receiver: Done storing of packet with big size ! %d\n", packet_len);
+    //bpf_printk("Receiver: Done storing of packet with big size ! %d\n", packet_len);
 
     /* Store the length of the packet that will also be coded */
     sourceSymbol->packet_length = packet_len;
@@ -133,7 +133,7 @@ static __always_inline int storeRepairSymbol(struct __sk_buff *skb, struct repai
 
     repairSymbol->packet_length = payload_len;
 
-    if (DEBUG) bpf_printk("Receiver: stored the repair symbol!\n");
+    //if (DEBUG) bpf_printk("Receiver: stored the repair symbol!\n");
 
     return 0;
 }

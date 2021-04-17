@@ -61,7 +61,7 @@ static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *sk
     }
 
     /* Get pointer to place in ring buffer for the source symbol */
-    struct sourceSymbol_t *sourceSymbol = &fecConvolution->sourceRingBuffer[ringBufferIndex & 0xff];
+    struct sourceSymbol_t *sourceSymbol = &fecConvolution->sourceRingBuffer[ringBufferIndex & (RLC_RECEIVER_BUFFER_SIZE - 1)];
     // See if the packet is already in the buffer
     struct tlvSource__convo_t *tlv_ss = (struct tlvSource__convo_t *)&sourceSymbol->tlv;
     // Second condition to ensure that this is not the initialization
@@ -70,7 +70,10 @@ static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *sk
         return -1;
     }
     // Otherwise we just reset the location
-    memset(sourceSymbol, 0, sizeof(struct sourceSymbol_t)); // Optimization ?
+    __u64 *ss64 = (__u64 *)sourceSymbol->packet;
+    for (int i = 0; i < MAX_PACKET_SIZE / 8; ++i) {
+        ss64[i] = 0;
+    }
 
     /* Store source symbol */
     err = storePacket_decode(skb, sourceSymbol);
@@ -90,11 +93,11 @@ static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *sk
     /* Indicate to all window information structures in the neighboorhood of the 
      * source symbol that it has been processed. As the repair symbol encodingSymbolID is the value
      * of the last source symbol => update windows after this source symbol */
-    for (__u8 i = 0; i < RLC_WINDOW_SIZE; ++i) {
+    /*for (__u8 i = 0; i < windowSize; ++i) {
         __u8 windowRingBufferIndex = (encodingSymbolID + i) % RLC_RECEIVER_BUFFER_SIZE;
-        window_info_t *window_info = &fecConvolution->windowInfoBuffer[windowRingBufferIndex & 0xff];
+        window_info_t *window_info = &fecConvolution->windowInfoBuffer[windowRingBufferIndex & (RLC_RECEIVER_BUFFER_SIZE - 1)];
         ++(window_info->received_ss);
-    }
+    }*/
 
     /* Try to recover from lost packet */
     // TODO
@@ -121,6 +124,7 @@ static __always_inline int receiveRepairSymbol__convolution(struct __sk_buff *sk
         bpf_printk("Double lol ?\n");
         return -1; // Lol
     }
+    __u8 windowSize = tlv.nss;
 
     /* Get pointer to global stucture */
     fecConvolution_t *fecConvolution = bpf_map_lookup_elem(&fecConvolutionInfoMap, &k);
@@ -137,7 +141,7 @@ static __always_inline int receiveRepairSymbol__convolution(struct __sk_buff *sk
     }
 
     /* Get pointer to information of the window */
-    window_info_t *window_info = &fecConvolution->windowInfoBuffer[windowRingBufferIndex & 0xff];
+    window_info_t *window_info = &fecConvolution->windowInfoBuffer[windowRingBufferIndex & (RLC_RECEIVER_BUFFER_SIZE - 1)];
     // TODO: check if already received repair symbol ?
     struct repairSymbol_t *repairSymbol = &window_info->repairSymbol;
     memset(repairSymbol, 0, sizeof(struct repairSymbol_t)); // Optimization ?
@@ -163,9 +167,9 @@ static __always_inline int receiveRepairSymbol__convolution(struct __sk_buff *sk
     //bpf_printk("Receiver: stored repair symbol: %d %d et repairFECinfo=%u\n", repairSymbol->packet_length, encodingSymbolID, tlv.repairFecInfo);
 
     /* Iterate over sourceRingBuffer to get information about possible reparation */
-    for (__u8 i = 0; i < RLC_WINDOW_SIZE; ++i) {
+    for (__u8 i = 0; i < windowSize && i < MAX_RLC_WINDOW_SIZE; ++i) {
         __u8 ringBufferIndex = (encodingSymbolID - i) % RLC_RECEIVER_BUFFER_SIZE;
-        struct tlvSource__convo_t *tlv_ss = (struct tlvSource__convo_t *)&fecConvolution->sourceRingBuffer[ringBufferIndex & 0xff].tlv;
+        struct tlvSource__convo_t *tlv_ss = (struct tlvSource__convo_t *)&fecConvolution->sourceRingBuffer[ringBufferIndex & (RLC_RECEIVER_BUFFER_SIZE - 1)].tlv;
         if (tlv_ss->encodingSymbolID - i == encodingSymbolID) {
             ++window_info->received_ss;
         }
@@ -176,7 +180,7 @@ static __always_inline int receiveRepairSymbol__convolution(struct __sk_buff *sk
     /* For now we give all data to user space to decode and recover from lost symbols
      * TODO: decode in eBPF kernel program and only send the recovered packets here
      * but currently not possible due to the verifier limitations */
-    if (try_to_recover_from_repair__convoRLC(skb, fecConvolution, window_info)) {
+    if (try_to_recover_from_repair__convoRLC(skb, fecConvolution, window_info, &tlv)) {
         bpf_perf_event_output(skb, map, BPF_F_CURRENT_CPU, fecConvolution, sizeof(fecConvolution_t));
     }
 

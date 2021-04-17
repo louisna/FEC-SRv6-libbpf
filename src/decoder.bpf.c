@@ -22,7 +22,7 @@ struct {
 
 SEC("lwt_seg6local")
 int decode(struct __sk_buff *skb) {
-    if (DEBUG) bpf_printk("Receiver: BPF triggered from packet with SRv6!\n");
+    //if (DEBUG) bpf_printk("Receiver: BPF triggered from packet with SRv6!\n");
     int err;
     int k = 0;
     

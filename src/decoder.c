@@ -70,18 +70,22 @@ static void debug_print(fecConvolution_t *fecConvolution) {
     }
 }
 
+int globalCount = 0;
+
 static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
     fecConvolution_t *fecConvolution = (fecConvolution_t *)data;
-    printf("Call triggered: %d\n", fecConvolution->encodingSymbolID);
+    //printf("Call triggered: %d\n", fecConvolution->encodingSymbolID);
 
     //debug_print(fecConvolution);
+
+    ++globalCount;
 
     /* Generate the repair symbol */
     int err = rlc__fec_recover(fecConvolution, rlc, sfd, local_addr);
     if (err < 0) {
         printf("ERROR. TODO: handle\n");
     } else {
-        printf("Correctly finished\n");
+        //printf("Correctly finished\n");
     }
 }
 
@@ -209,6 +213,8 @@ int main(int argc, char **argv)
         perror("Cannot close socket");
         goto cleanup;
     }
+
+    printf("GLOBAL COUNT: %d\n", globalCount);
 
 cleanup:
     // We reach this point when we Ctrl+C with signal handling

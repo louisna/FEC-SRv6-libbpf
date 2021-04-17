@@ -110,7 +110,7 @@ int send_raw_socket_recovered(int sfd, const recoveredSource_t *repairSymbol, st
      * => we are given a const variable, but we will need to change some fields */
     memcpy(packet, repairSymbol->packet, repairSymbol->packet_length);
     packet_length = repairSymbol->packet_length;
-    printf("Packet recovered of length: %ld\n", packet_length);
+    //printf("Packet recovered of length: %ld\n", packet_length);
     
     /* Get pointer to the IPv6 header and Segment Routing header */
     iphdr = (struct ip6_hdr *)&packet[0];
@@ -141,7 +141,7 @@ int send_raw_socket_recovered(int sfd, const recoveredSource_t *repairSymbol, st
         return -1; // TODO: maybe just use the last segment instead ?
     }
     next_segment_idx = i - 1;
-    printf("Value of next_segment_idx: %d\n", next_segment_idx);
+    //printf("Value of next_segment_idx: %d\n", next_segment_idx);
 
     /* Copy the address of the next segment in the Destination Address entry of the IPv6 header */
     memset(&dst, 0, sizeof(dst));

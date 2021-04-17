@@ -36,19 +36,8 @@ int srv6_fec_encode(struct __sk_buff *skb)
     }
 
     /* Get pointer to structure of the plugin */
-    /*mapStruct_t *mapStruct = bpf_map_lookup_elem(&fecBuffer, &k);
-    if (!mapStruct) {
-        if (DEBUG) bpf_printk("Sender: impossible to get global pointer\n");
-        return BPF_ERROR;
-    }*/
-
-    /* Create TLV structure and call FEC Framework
-    struct tlvSource__block_t tlv;
-    err = fecFramework(skb, &tlv, mapStruct);
-    if (err < 0) {
-        if (DEBUG) bpf_printk("Sender: Error in FEC Framework\n");
-        return BPF_ERROR;
-    } */
+    //mapStruct_t *mapStruct = bpf_map_lookup_elem(&fecBuffer, &k);
+    //if (!mapStruct) { if (DEBUG) bpf_printk("Sender: impossible to get global pointer\n"); return BPF_ERROR;}
 
     fecConvolution_t *fecConvolution = bpf_map_lookup_elem(&fecConvolutionInfoMap, &k);
     if (!fecConvolution) return BPF_ERROR;
@@ -57,14 +46,15 @@ int srv6_fec_encode(struct __sk_buff *skb)
     err = fecFramework__convolution(skb, &tlv, fecConvolution, &events);
     //err = fecFramework__block(skb, &tlv, mapStruct, &events);
     if (err < 0) {
-        if (DEBUG) bpf_printk("Sender: Error in FEC Framework\n");
+        bpf_printk("Sender: Error in FEC Framework\n");
         return BPF_ERROR;
     }
 
     /* Add the TLV to the current source symbol and forward */
     __u16 tlv_length = sizeof(struct tlvSource__convo_t);
     err = seg6_add_tlv(skb, srh, (srh->hdrlen + 1) << 3, (struct sr6_tlv_t *)&tlv, tlv_length);
-    bpf_printk("Sender: return value of TLV add: %d\n", err);
+    //bpf_printk("Sender: return value of TLV add: %d\n", err);
+    if (err < 0) bpf_printk("Sender: error\n");
     return (err) ? BPF_ERROR : BPF_OK;
 }
 

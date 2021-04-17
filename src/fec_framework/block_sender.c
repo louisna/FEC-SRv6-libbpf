@@ -36,6 +36,10 @@ static __always_inline int fecFramework__block(struct __sk_buff *skb, void *csh_
 
     /* Load the source symbol structure to store the packet */
     struct sourceSymbol_t *sourceSymbol = &mapStruct->sourceSymbol;
+    __u64 *ss64 = (__u64 *)sourceSymbol->packet;
+    for (int i = 0; i < MAX_PACKET_SIZE / 8; ++i) {
+        ss64[i] = 0;
+    }
 
     /* Store source symbol */
     err = storePacket(skb, sourceSymbol);

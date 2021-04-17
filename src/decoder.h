@@ -4,14 +4,11 @@
 #include "fec_srv6.h"
 
 #define BPF_ERROR BPF_DROP  // Choose action when an error occurs in the process
-#define DEBUG 1
-
-#define MAX_BLOCK 5  // Number of blocks we can simultaneously store
-#define MAX_SOURCE_SYMBOLS 25  // Number of source symbols per block
+#define DEBUG 0
 
 #define RLC_RECEIVER_BUFFER_SIZE 16
-#define RLC_WINDOW_SIZE 4  // Usefull ?
-#define RLC_WINDOW_SLIDE 2 // Usefull ?
+
+#define MAX_BLOCK 5
 
 /* Structures */
 struct sourceSymbol_t {

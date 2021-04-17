@@ -2,6 +2,7 @@
 #include "../prng/tinymt32.c"
 #include "../gf256/swif_symbol.c"
 #include "../encoder.h"
+#define MIN(a, b) ((a < b) ? a : b)
 
 static void rlc__get_coefs(tinymt32_t *prng, uint32_t seed, int n, uint8_t coefs[n]) {
     tinymt32_init(prng, seed);
@@ -17,24 +18,27 @@ static int rlc__generateRepairSymbols(fecConvolution_t *fecConvolution, encode_r
     uint16_t max_length = 0;
     uint32_t encodingSymbolID = fecConvolution->encodingSymbolID;
     struct repairSymbol_t *repairSymbol = rlc->repairSymbol;
+    uint8_t windowSize = fecConvolution->currentWindowSize;
+    uint8_t windowSlide = fecConvolution->currentWindowSlide;
+    //printf("size=%d, slide=%d\n", windowSize, windowSlide);
 
     tinymt32_t prng;
     prng.mat1 = 0x8f7011ee;
     prng.mat2 = 0xfc78ff1f;
     prng.tmat = 0x3793fdff;
 
-    uint8_t *coefs = malloc(sizeof(uint8_t) * RLC_WINDOW_SIZE);
+    uint8_t *coefs = malloc(sizeof(uint8_t) * windowSize);
     if (!coefs) return -1;
 
-    rlc__get_coefs(&prng, fecConvolution->repairKey, RLC_WINDOW_SIZE, coefs);
+    rlc__get_coefs(&prng, fecConvolution->repairKey, windowSize, coefs);
     //printf("repairKey is %d\n", fecConvolution->repairKey);
-    /*for (int jj = 0; jj < RLC_WINDOW_SIZE; ++jj) {
-        printf("Valeur du coef: %d\n", coefs[jj]);
-    }*/
+    //for (int jj = 0; jj < windowSize; ++jj) {
+    //    printf("Valeur du coef: %d\n", coefs[jj]);
+    //}
 
-    for (uint8_t i = 0; i < RLC_WINDOW_SIZE; ++i) {
+    for (uint8_t i = 0; i < windowSize; ++i) {
         /* Get the source symbol in order in the window */
-        uint8_t sourceBufferIndex = (encodingSymbolID - RLC_WINDOW_SIZE + i + 1) % RLC_BUFFER_SIZE;
+        uint8_t sourceBufferIndex = (encodingSymbolID - windowSize + i + 1) % windowSize;
         struct sourceSymbol_t *sourceSymbol = &fecConvolution->sourceRingBuffer[sourceBufferIndex];
 
         /* Compute the maximum length of the source symbols */
@@ -43,9 +47,9 @@ static int rlc__generateRepairSymbols(fecConvolution_t *fecConvolution, encode_r
 
     uint16_t coded_length = 0;
 
-    for (uint8_t i = 0; i < RLC_WINDOW_SIZE; ++i) {
+    for (uint8_t i = 0; i < windowSize; ++i) {
         /* Get the source symbol in order in the window */
-        uint8_t sourceBufferIndex = (encodingSymbolID - RLC_WINDOW_SIZE + i + 1) % RLC_BUFFER_SIZE;
+        uint8_t sourceBufferIndex = (encodingSymbolID - windowSize + i + 1) % windowSize;
         struct sourceSymbol_t *sourceSymbol = &fecConvolution->sourceRingBuffer[sourceBufferIndex];
         //printf("Source symbol #%d with idx=%u at index %d=%x with coef=%u\n", i, sourceBufferIndex, sourceBufferIndex, sourceSymbol->packet[142], coefs[i]);
 
@@ -63,10 +67,6 @@ static int rlc__generateRepairSymbols(fecConvolution_t *fecConvolution, encode_r
 
     /* And finally the length of the repair symbol is the maximum length instead of the coded length */
     repairSymbol->packet_length = max_length;
-
-    /*for (int l = 0; l < MAX_PACKET_SIZE; ++l) {
-        printf("Repair symbol after encoding at index %d=%x\n", l, repairSymbol->packet[l]);
-    }*/
 
     free(coefs);
     
