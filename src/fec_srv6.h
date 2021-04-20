@@ -8,7 +8,7 @@
 #define BPF_PACKET_HEADER __attribute__((packed))
 
 /* Block FEC Framework */
-#define MAX_BLOCK_SIZE 8
+#define MAX_BLOCK_SIZE 10
 
 struct tlvSource__block_t {
     __u8 tlv_type;

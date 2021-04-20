@@ -30,7 +30,7 @@ static __always_inline int fecFramework__convolution(struct __sk_buff *skb, void
     __u8 windowSize = fecConvolution->currentWindowSize;
     __u8 DT = 15; // TODO find good value
 
-    bpf_printk("Valeur de dinwod size=%u et %u\n", windowSize, (MAX_RLC_WINDOW_SIZE - 1));
+    //bpf_printk("Valeur de dinwod size=%u et %u\n", windowSize, (MAX_RLC_WINDOW_SIZE - 1));
 
     /* Complete the source symbol TLV */
     tlv->tlv_type = TLV_CODING_SOURCE; // TODO: other value to distinguish ??

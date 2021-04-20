@@ -42,6 +42,7 @@ static __always_inline int fecScheme__blockXOR(struct __sk_buff *skb, mapStruct_
 
     __u16 sourceBlock = mapStruct->soubleBlock; 
     __u16 sourceSymbolCount = mapStruct->sourceSymbolCount;
+    __u8 blockSize = mapStruct->currentBlockSize;
 
     /* Load the unique repair symbol pointer from map */
     struct repairSymbol_t *repairSymbol = &mapStruct->repairSymbol;
@@ -62,7 +63,7 @@ static __always_inline int fecScheme__blockXOR(struct __sk_buff *skb, mapStruct_
     }
 
     /* Creates the repair symbol TLV if the repair symbol must be sent */
-    if (sourceSymbolCount == MAX_BLOCK_SIZE - 1) { // -1 to convert from number to index
+    if (sourceSymbolCount == mapStruct->currentBlockSize - 1) { // -1 to convert from number to index
         // Get the TLV from the repairSymbol pointer
         struct tlvRepair__block_t *repairTLV = (struct tlvRepair__block_t *)&(repairSymbol->tlv);
         repairTLV->tlv_type = TLV_CODING_REPAIR;
@@ -70,7 +71,7 @@ static __always_inline int fecScheme__blockXOR(struct __sk_buff *skb, mapStruct_
         repairTLV->sourceBlockNb = sourceBlock;
         repairTLV->repairSymbolNb = 0; // There is only one repair symbol
         repairTLV->nrs = 1;
-        repairTLV->nss = MAX_BLOCK_SIZE;
+        repairTLV->nss = blockSize;
 
         return 1;
     }

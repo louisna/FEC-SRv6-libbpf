@@ -113,33 +113,46 @@ void gaussElimination(int n_eq, int n_unknowns, uint8_t **a, uint8_t *constant_t
 
     int candidate = n_unknowns - 1;
     for (i = n_eq - 1; i >= 0; --i) {
-        while (a[i][candidate] == 0 && candidate >= 0) {
-            undetermined[candidate--] = true;
-        }
-        memcpy(x[candidate], constant_temps[i], symbol_size);
-        for (int j = 0; j < candidate; ++j) {
+        bool only_zeroes = true;
+        for (int j = 0; j < n_unknowns; ++j) {
             if (a[i][j] != 0) {
-                undetermined[candidate] = true;
+                only_zeroes = false;
                 break;
             }
         }
-        for (j = candidate + 1; j < n_unknowns; ++j) {
-            if (a[i][j] != 0) {
-                if (undetermined[j]) {
+        if (!only_zeroes) {
+            while (a[i][candidate] == 0 && candidate >= 0) {
+                undetermined[candidate--] = true;
+            }
+            if (candidate < 0) {
+                printf("System partially undetermined\n");
+                break;
+            }
+            memcpy(x[candidate], constant_temps[i], symbol_size);
+            for (int j = 0; j < candidate; ++j) {
+                if (a[i][j] != 0) {
                     undetermined[candidate] = true;
-                } else {
-                    symbol_sub_scaled(x[candidate], a[i][j], x[j], symbol_size, mul);
-                    a[i][j] = 0;
+                    break;
                 }
             }
+            for (j = candidate + 1; j < n_unknowns; ++j) {
+                if (a[i][j] != 0) {
+                    if (undetermined[j]) {
+                        undetermined[candidate] = true;
+                    } else {
+                        symbol_sub_scaled(x[candidate], a[i][j], x[j], symbol_size, mul);
+                        a[i][j] = 0;
+                    }
+                }
+            }
+            if (symbol_is_zero(x[candidate], symbol_size) || a[i][candidate] == 0) {
+                undetermined[candidate] = true;
+            } else if (!undetermined[candidate]) {
+                symbol_mul(x[candidate], inv[a[i][candidate]], symbol_size, mul);
+                a[i][candidate] = gf256_mul(a[i][candidate], inv[a[i][candidate]], mul);
+            } 
+            candidate--;
         }
-        if (symbol_is_zero(x[candidate], symbol_size) || a[i][candidate] == 0) {
-            undetermined[candidate] = true;
-        } else if (!undetermined[candidate]) {
-            symbol_mul(x[candidate], inv[a[i][candidate]], symbol_size, mul);
-            a[i][candidate] = gf256_mul(a[i][candidate], inv[a[i][candidate]], mul);
-        } 
-        candidate--;
     }
     if (candidate >= 0) {
         memset(undetermined, true, (candidate + 1) * sizeof(bool));
@@ -326,12 +339,12 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
             memset(system_coefs[i], 0, nb_unknowns);
             uint16_t repairKey = ((struct tlvRepair__convo_t *)&repairSymbol->tlv)->repairFecInfo & 0xff;
             rlc__get_coefs(&prng, repairKey, rlc_window_size, coefs); // TODO: coefs specific ? line 454
-            printf("repairKey is %d venant de %x\n", repairKey, ((struct tlvRepair__convo_t *)&repairSymbol->tlv)->repairFecInfo);
+            //printf("repairKey is %d venant de %x\n", repairKey, ((struct tlvRepair__convo_t *)&repairSymbol->tlv)->repairFecInfo);
             //struct tlvRepair__convo_t *tlv = ((struct tlvRepair__convo_t *)&repairSymbol->tlv);
             //printf("Est-ce que j'ai bien le repair tlv ? tlv_type=%d, tlv_encoding=%d, fecInfo=%d\n", tlv->tlv_type, tlv->encodingSymbolID, tlv->repairFecInfo);
-            for (int jj = 0; jj < rlc_window_size; ++jj) {
-                printf("Valeur du coef: %d\n", coefs[jj]);
-            }
+            //for (int jj = 0; jj < rlc_window_size; ++jj) {
+            //    printf("Valeur du coef: %d\n", coefs[jj]);
+            //}
             int current_unknown = 0;
             for (int j = 0; j < rlc_window_size; ++j) {
                 int idx = rs * rlc_window_slide + j;
@@ -380,7 +393,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
             // TODO: send the packet
             //print_recovered(recovered);
             ++total_recovered;
-            printf("Recovered source symbols with ID=%u, total recovered=%d\n", recovered->encodingSymbolID, total_recovered);
+            //printf("Recovered source symbols with ID=%u, total recovered=%d\n", recovered->encodingSymbolID, total_recovered);
             send_raw_socket_recovered(sfd, recovered, local_addr);
             
         }
@@ -410,7 +423,6 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
     free(coefs);
     free(undetermined);
     free(unknowns_idx);
-    
     return err;
 }
 

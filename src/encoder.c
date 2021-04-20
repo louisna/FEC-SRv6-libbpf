@@ -54,7 +54,7 @@ static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz)
      */
     const struct repairSymbol_t *repairSymbol = (struct repairSymbol_t *)data;
     if (total % 10000 == 0) printf("CALL TRIGGERED!\n");
-    printf("Information sur mon repair symbol: %u %u\n", repairSymbol->packet_length, repairSymbol->tlv[0]);
+    //printf("Information sur mon repair symbol: %u %u\n", repairSymbol->packet_length, repairSymbol->tlv[0]);
 
     ++total;
     send_raw_socket(sfd, repairSymbol, src, dst);
@@ -86,8 +86,8 @@ static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
 static void handle_events(int map_fd_events) {
     /* Define structure for the perf event */
     struct perf_buffer_opts pb_opts = {
-        .sample_cb = fecScheme,
-        //.sample_cb = send_repairSymbol_XOR,
+        //.sample_cb = fecScheme,
+        .sample_cb = send_repairSymbol_XOR,
     };
     struct perf_buffer *pb = NULL;
     int err;
@@ -177,16 +177,16 @@ int main(int argc, char *argv[]) {
     /* Get file descriptor of maps and init the value of the structures */
     struct bpf_map *map_fecBuffer = skel->maps.fecBuffer;
     int map_fd_fecBuffer = bpf_map__fd(map_fecBuffer);
-    mapStruct_t struct_zero = {};
-    bpf_map_update_elem(map_fd_fecBuffer, &k0, &struct_zero, BPF_ANY);
+    mapStruct_t block_init = {0};
+    block_init.currentBlockSize = 3; // TODO: here MIN(...)
+    bpf_map_update_elem(map_fd_fecBuffer, &k0, &block_init, BPF_ANY);
 
     struct bpf_map *map_fecConvolutionBuffer = skel->maps.fecConvolutionInfoMap;
     int map_fd_fecConvolutionBuffer = bpf_map__fd(map_fecConvolutionBuffer);
     fecConvolution_t convo_init = {0};
-    convo_init.currentWindowSize = 4;
-    convo_init.currentWindowSlide = 2;
+    convo_init.currentWindowSize = 6; // TODO: here MIN(...)
+    convo_init.currentWindowSlide = 3;
     bpf_map_update_elem(map_fd_fecConvolutionBuffer, &k0, &convo_init, BPF_ANY);
-
 
     struct bpf_map *map_events = skel->maps.events;
     int map_fd_events = bpf_map__fd(map_events);

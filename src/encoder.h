@@ -25,6 +25,7 @@ typedef struct mapStruct {
     __u16 sourceSymbolCount;
     struct sourceSymbol_t sourceSymbol;
     struct repairSymbol_t repairSymbol;
+    __u8 currentBlockSize;
 } mapStruct_t;
 
 /* CONVOLUTION */

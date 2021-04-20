@@ -25,7 +25,7 @@ static __always_inline int can_decode_xor(xorStruct_t *xorStruct) {
      * If more than one loss in this repair block, cannot recover
      * TODO: if we disable the tracing, we can make only one 'if' condition */
     int total_loss = sourceBlock->nss - sourceBlock->receivedSource;
-    if (DEBUG) bpf_printk("Receiver: receivedSource: %d and nss: %d\n", sourceBlock->receivedSource, sourceBlock->nss);
+    //bpf_printk("Receiver: receivedSource: %d and nss: %d\n", sourceBlock->receivedSource, sourceBlock->nss);
     if (total_loss == 0) {
         if (DEBUG) bpf_printk("Receiver: no loss, no need for recovery\n");
         return 0;

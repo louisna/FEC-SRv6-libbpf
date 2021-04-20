@@ -15,13 +15,17 @@ class WrongPacketSize(Exception):
 def craft_srv6_packet(args, payload) -> IPv6:
     pkt = IPv6()
     pkt.src = args.source
-    pkt.dst = args.segments[-1]
 
-    # Segment Routing Header
-    srh = IPv6ExtHdrSegmentRouting()
-    srh.addresses = args.segments
-    srh.lastentry = len(srh.addresses) - 1
-    pkt = pkt / srh
+    if args.destination:
+        pkt.dst = args.destination
+    else:
+        pkt.dst = args.segments[-1]
+
+        # Segment Routing Header
+        srh = IPv6ExtHdrSegmentRouting()
+        srh.addresses = args.segments
+        srh.lastentry = len(srh.addresses) - 1
+        pkt = pkt / srh
 
     # Transport layer
     transport = UDP(sport=123, dport=4444)
@@ -82,6 +86,7 @@ def main():
     parser.add_argument("-t", "--sleep_time", help="Time in seconds between two consecutive packets", type=float, default=0.001)
     parser.add_argument("-f", "--file", help="Input file to find the payload. First=filename, second=packet size", nargs="+", default=None)
     parser.add_argument("-v", "--verbose", help="Print debug messages", action="store_true")
+    parser.add_argument("-d", "--destination", help="Packet destination if no segments", type=str, default=None)
     args = parser.parse_args()
 
     print(args, file=sys.stderr)

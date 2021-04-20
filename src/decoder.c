@@ -59,7 +59,7 @@ static void send_recovered_symbol_XOR(void *ctx, int cpu, void *data, __u32 data
      * ->packet_length: the length of the recovered packet
      */
     const struct repairSymbol_t *repairSymbol = (struct repairSymbol_t *)data;
-    printf("CALL TRIGGERED!\n");
+    //printf("CALL TRIGGERED!\n");
 
     send_raw_socket(sfd, repairSymbol, local_addr);
 }
@@ -92,8 +92,8 @@ static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
 static void handle_events(int map_fd_events) {
     /* Define structure for the perf event */
     struct perf_buffer_opts pb_opts = {
-        .sample_cb = fecScheme,
-        //.sample_cb = send_recovered_symbol_XOR,
+        //.sample_cb = fecScheme,
+        .sample_cb = send_recovered_symbol_XOR,
     };
     struct perf_buffer *pb = NULL;
     int err;

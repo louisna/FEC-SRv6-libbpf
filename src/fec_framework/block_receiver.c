@@ -93,6 +93,8 @@ static __always_inline int receiveSourceSymbol__block(struct __sk_buff *skb, str
         sourceBlock->nss = 0;
         sourceBlock->nrs = 0;
     }
+
+    //bpf_printk("Receiver: received ss=%d\n", sourceBlock->receivedSource);
     
     /* Call decoding function. This function:
      * 1) If this is the first source for this block, re-init the corresponding repair block

@@ -72,22 +72,32 @@ int send_raw_socket(int sfd, const struct repairSymbol_t *repairSymbol, struct s
     /* IPv6 Source address */
     bcopy(&src.sin6_addr, &(iphdr->ip6_src), 16);
 
+    /* IPv6 droper address */
+    struct sockaddr_in6 drp;
+    memset(&drp, 0, sizeof(src));
+    src.sin6_family = AF_INET6;
+    if (inet_pton(AF_INET6, "fc00::d", drp.sin6_addr.s6_addr) != 1) {
+        perror("inet ntop src");
+        return -1;
+    }
+
 	/* IPv6 Destination address */
-	bcopy(&dst.sin6_addr, &(iphdr->ip6_dst), 16);
+	bcopy(&drp.sin6_addr, &(iphdr->ip6_dst), 16);
 
     /* Segment Routing header */
     srh = (struct ipv6_sr_hdr *)&packet[ip6_length];
-    srh_length = sizeof(struct ipv6_sr_hdr) + 16 + 16;
+    srh_length = sizeof(struct ipv6_sr_hdr) + 16 + 16 + 16;
     srh->nexthdr = 17; // UDP
-    srh->hdrlen = 4 + 2;
+    srh->hdrlen = 4 + 2 + 2;
     srh->type = 4;
-    srh->segments_left = 1;
-    srh->first_segment = 1;
+    srh->segments_left = 2;
+    srh->first_segment = 2;
     srh->flags = 0;
     srh->tag = 0;
 
     bcopy(&src.sin6_addr, &(srh->segments[0]), 16);
     bcopy(&dst.sin6_addr, &(srh->segments[1]), 16);
+    bcopy(&drp.sin6_addr, &(srh->segments[2]), 16);
 
     /* TLV */
     tlv_length = sizeof(struct tlvRepair__block_t);

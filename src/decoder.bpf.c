@@ -49,11 +49,11 @@ int decode(struct __sk_buff *skb) {
 
     /* Call FEC framework depending on the type of packet */
     if (tlv_type == TLV_CODING_SOURCE) {
-        //err = receiveSourceSymbol__block(skb, srh, cursor, &events);
-        err = receiveSourceSymbol__convolution(skb, srh, cursor, &events);
+        err = receiveSourceSymbol__block(skb, srh, cursor, &events);
+        //err = receiveSourceSymbol__convolution(skb, srh, cursor, &events);
     } else {
-        //err = receiveRepairSymbol__block(skb, srh, cursor, &events);
-        err = receiveRepairSymbol__convolution(skb, srh, cursor, &events);
+        err = receiveRepairSymbol__block(skb, srh, cursor, &events);
+        //err = receiveRepairSymbol__convolution(skb, srh, cursor, &events);
     }
 
     if (err < 0) {
