@@ -2,9 +2,56 @@
 #include <netinet/ip6.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
+#include <netinet/tcp.h>
 #include <linux/seg6.h>
 
 #include "decoder.h"
+
+void compute_tcp_checksum(struct ip6_hdr *pIph, unsigned short *ipPayload, unsigned short tcpLen) {
+    register unsigned long sum = 0;
+    int i;
+    struct tcphdr *tcphdrp = (struct tcphdr*)(ipPayload);
+    printf("Longueur tcp est=%x\n", tcphdrp->th_sport);
+    //add the pseudo header 
+    //the source ip
+    struct in6_addr *src_addr = &pIph->ip6_src;
+    struct in6_addr *dst_addr = &pIph->ip6_dst;
+    uint16_t *ip_src = (void *)src_addr, *ip_dst = (void *)dst_addr;
+    //the dest ip
+    for (i = 0 ; i <= 7 ; ++i) 
+        sum += *(ip_src++);
+
+    for (i = 0 ; i <= 7 ; ++i) 
+        sum += *(ip_dst++);
+    //protocol and reserved: 6
+    sum += htons(IPPROTO_TCP);
+    //the length
+    sum += htons(tcpLen);
+
+    printf("Passage 1\n");
+ 
+    //add the IP payload
+    //initialize checksum to 0
+    tcphdrp->check = 0;
+    while (tcpLen > 1) {
+        sum += * ipPayload++;
+        tcpLen -= 2;
+    }
+    printf("Passage 2\n");
+    //if any bytes left, pad the bytes and add
+    if(tcpLen > 0) {
+        //printf("+++++++++++padding, %dn", tcpLen);
+        sum += ((*ipPayload)&htons(0xFF00));
+    }
+      //Fold 32-bit sum to 16 bits: add carrier to result
+      while (sum>>16) {
+          sum = (sum & 0xffff) + (sum >> 16);
+      }
+      printf("Passage 3\n");
+      sum = ~sum;
+    //set computation result
+    tcphdrp->check = (unsigned short)sum;
+}
 
 int send_raw_socket(int sfd, const struct repairSymbol_t *repairSymbol, struct sockaddr_in6 local_addr) {
     // struct sockaddr_in6 src;
@@ -32,6 +79,7 @@ int send_raw_socket(int sfd, const struct repairSymbol_t *repairSymbol, struct s
      */
     memcpy(packet, repairSymbol->packet, repairSymbol->packet_length);
     packet_length = repairSymbol->packet_length;
+    printf("Recovering packet with packet length=%ld\n", packet_length);
 
     
     /* Get pointer to the IPv6 header and Segment Routing header */
@@ -151,6 +199,22 @@ int send_raw_socket_recovered(int sfd, const recoveredSource_t *repairSymbol, st
 
     /* Update the value of next segment in the Segment Routing header */
     srh->segments_left = next_segment_idx;
+
+    /* Compute the Checksum for IP for now */
+    size_t srh_len = 8 + (srh->hdrlen << 3);
+    if (srh->nexthdr == 6) { // TCP
+        printf("Avant\n");
+        struct tcphdr *tcp = (struct tcphdr *)&packet[ip6_length + srh_len];
+        for (int i = 0; i < 32; ++i) {
+            printf("%x ", packet[ip6_length + srh_len + i]);
+        }
+        printf("\n");
+        printf("Apres, avant calcul, le checksum vaut: %x\n", tcp->check);
+        uint16_t tcp_len = repairSymbol->packet_length - ip6_length - srh_len;
+        printf("Valeur de tcp len:%u\n", tcp_len);
+        compute_tcp_checksum(iphdr, (unsigned short *)tcp, tcp_len);
+        printf("Apres, apres calcul, le checksum vaut: %x\n", tcp->check);
+    }
 
     /* Send packet */
     bytes = sendto(sfd, packet, packet_length, 0, (struct sockaddr *)&dst, sizeof(dst));
