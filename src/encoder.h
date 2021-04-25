@@ -26,6 +26,7 @@ typedef struct mapStruct {
     struct sourceSymbol_t sourceSymbol;
     struct repairSymbol_t repairSymbol;
     __u8 currentBlockSize;
+    struct bpf_spin_lock lock;
 } mapStruct_t;
 
 /* CONVOLUTION */
@@ -37,6 +38,7 @@ typedef struct fecConvolution {
     struct tlvRepair__convo_t repairTlv;
     __u8 currentWindowSize;
     __u8 currentWindowSlide;
+    struct bpf_spin_lock lock;
 } fecConvolution_t;
 
 typedef struct {

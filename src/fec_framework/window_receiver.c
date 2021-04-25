@@ -28,14 +28,14 @@ static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *sk
     struct tlvSource__convo_t tlv;
     err = bpf_skb_load_bytes(skb, tlv_offset, &tlv, sizeof(struct tlvSource__convo_t));
     if (err < 0) {
-        if (DEBUG) bpf_printk("Receiver: impossible to load the source TLV\n");
+         bpf_printk("Receiver: impossible to load the source TLV\n");
         return 0;
     }
 
     /* Remove the TLV from the packet as we have a local copy */
     err = seg6_delete_tlv2(skb, srh, tlv_offset);
     if (err != 0) {
-        if (DEBUG) bpf_printk("Receiver: impossible to remove the source TLV from the packet\n");
+         bpf_printk("Receiver: impossible to remove the source TLV from the packet\n");
         return 0;
     }
 
@@ -49,14 +49,14 @@ static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *sk
     /* Get pointer to global stucture */
     fecConvolution_t *fecConvolution = bpf_map_lookup_elem(&fecConvolutionInfoMap, &k);
     if (!fecConvolution) {
-        if (DEBUG) bpf_printk("Receiver: impossible to get pointer to the structure\n");
+         bpf_printk("Receiver: impossible to get pointer to the structure\n");
         return BPF_ERROR;
     }
 
     /* Get index in the ring buffer based on the encodingSymbolID value */
     __u8 ringBufferIndex = encodingSymbolID % RLC_RECEIVER_BUFFER_SIZE;
     if (ringBufferIndex < 0 || ringBufferIndex >= RLC_RECEIVER_BUFFER_SIZE) {
-        if (DEBUG) bpf_printk("Receiver: impossible index\n");
+         bpf_printk("Receiver: impossible index\n");
         return -1;
     }
 
@@ -66,7 +66,7 @@ static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *sk
     struct tlvSource__convo_t *tlv_ss = (struct tlvSource__convo_t *)&sourceSymbol->tlv;
     // Second condition to ensure that this is not the initialization
     if (tlv_ss->encodingSymbolID == encodingSymbolID && tlv_ss->tlv_type != 0) {
-        if (DEBUG) bpf_printk("Receiver: source symbol already in the buffer: %d %d\n", tlv_ss->encodingSymbolID, encodingSymbolID);
+         bpf_printk("Receiver: source symbol already in the buffer: %d %d\n", tlv_ss->encodingSymbolID, encodingSymbolID);
         return -1;
     }
     // Otherwise we just reset the location
@@ -78,10 +78,10 @@ static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *sk
     /* Store source symbol */
     err = storePacket_decode(skb, sourceSymbol);
     if (err < 0) {
-        if (DEBUG) bpf_printk("Receiver: error from storePacket confirmed\n");
+         bpf_printk("Receiver: error from storePacket confirmed\n");
         return -1;
     } else if (err > 0) {
-        if (DEBUG) bpf_printk("Receiver: confirmed packet too big for protection\n");
+         bpf_printk("Receiver: confirmed packet too big for protection\n");
         return -1;
     }
 
@@ -114,7 +114,7 @@ static __always_inline int receiveRepairSymbol__convolution(struct __sk_buff *sk
     struct tlvRepair__convo_t tlv;
     err = bpf_skb_load_bytes(skb, tlv_offset, &tlv, sizeof(struct tlvRepair__block_t));
     if (err < 0) {
-        if (DEBUG) bpf_printk("Receiver: impossible to load the repair TLV\n");
+         bpf_printk("Receiver: impossible to load the repair TLV\n");
         return 0;
     }
 
@@ -129,14 +129,14 @@ static __always_inline int receiveRepairSymbol__convolution(struct __sk_buff *sk
     /* Get pointer to global stucture */
     fecConvolution_t *fecConvolution = bpf_map_lookup_elem(&fecConvolutionInfoMap, &k);
     if (!fecConvolution) {
-        if (DEBUG) bpf_printk("Receiver: impossible to get pointer to the structure\n");
+         bpf_printk("Receiver: impossible to get pointer to the structure\n");
         return BPF_ERROR;
     }
 
     /* Get index in the ring buffer based on the encodingSymbolID value */
     __u8 windowRingBufferIndex = encodingSymbolID % RLC_RECEIVER_BUFFER_SIZE;
     if (windowRingBufferIndex < 0 || windowRingBufferIndex >= RLC_RECEIVER_BUFFER_SIZE) {
-        if (DEBUG) bpf_printk("Receiver: impossible index\n");
+         bpf_printk("Receiver: impossible index\n");
         return -1;
     }
 
@@ -149,10 +149,10 @@ static __always_inline int receiveRepairSymbol__convolution(struct __sk_buff *sk
     /* Store repair symbol */
     err = storeRepairSymbol(skb, repairSymbol, srh);
     if (err < 0) {
-        if (DEBUG) bpf_printk("Receiver: error from storeRepairSymbol confirmed\n");
+         bpf_printk("Receiver: error from storeRepairSymbol confirmed\n");
         return -1;
     } else if (err > 0) {
-        if (DEBUG) bpf_printk("Receiver: confirmed packet too big for protection\n");
+         bpf_printk("Receiver: confirmed packet too big for protection\n");
         return -1;
     }
 

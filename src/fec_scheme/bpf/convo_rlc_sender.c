@@ -11,9 +11,8 @@
 #include "../../libseg6.c"
 #include "../../encoder.h"
 
-static __always_inline int fecScheme__convoRLC(struct __sk_buff *skb, fecConvolution_t *fecConvolution, __u8 newRingBuffSize) {
+static __always_inline int fecScheme__convoRLC(struct __sk_buff *skb, fecConvolution_t *fecConvolution, __u8 newRingBuffSize, __u32 encodingSymbolID) {
     int err;
-    __u32 encodingSymbolID = fecConvolution->encodingSymbolID;
     __u8 repairKey = fecConvolution->repairKey;
     __u8 windowSize = fecConvolution->currentWindowSize;
     __u8 windowSlide = fecConvolution->currentWindowSlide;

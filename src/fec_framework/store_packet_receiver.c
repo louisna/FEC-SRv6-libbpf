@@ -17,8 +17,14 @@
 static __always_inline int storePacket_decode(struct __sk_buff *skb, struct sourceSymbol_t *sourceSymbol) {
     int err;
 
-    void *data = (void *)(long)(skb->data);
-    void *data_end = (void *)(long)(skb->data_end);
+    /* Get the packet length from the IPv6 header to the end of the payload */
+    __u32 packet_len = skb->len;
+
+    /* Ensures that we do not try to protect a too big packet */
+    if (packet_len > MAX_PACKET_SIZE) {
+        if (DEBUG) bpf_printk("Receiver: too big packet, does not protect\n");
+        return 1;
+    }
 
     /* Get pointer to the IPv6 header of the packet, i.e. the beginning of the source symbol */
     struct ip6_t *ip6 = seg6_get_ipv6(skb);
@@ -27,31 +33,11 @@ static __always_inline int storePacket_decode(struct __sk_buff *skb, struct sour
         return -1;
     }
 
-    /* Get the packet length from the IPv6 header to the end of the payload */
-    __u32 packet_len = ((long)data_end) - ((long)(void *)ip6);
-    if ((void *)ip6 + packet_len > data_end) {
-        if (DEBUG) bpf_printk("Receiver: inconsistent payload length\n");
-        return -1;
-    }
-
-    /* Ensures that we do not try to protect a too big packet */
-    if (packet_len > MAX_PACKET_SIZE) {
-        if (DEBUG) bpf_printk("Receiver: too big packet, does not protect\n");
-        return 1;
-    }
-
-    __u32 ipv6_offset = (long)ip6 - (long)data;
-    if (ipv6_offset < 0) return -1;
+    __u32 ipv6_offset = (__u64)ip6 - (__u64)skb->data;
+    if (ipv6_offset < 0 || ipv6_offset > MAX_PACKET_SIZE) return -1;
 
     /* Load the payload of the packet and store it in sourceSymbol */
-    const __u16 size = packet_len - 1; // Small trick here because the verifier thinks the value can be negative
-    if (size < sizeof(sourceSymbol->packet) && ipv6_offset + size <= (long)data_end) {
-        // TODO: 0xffff should be set as global => ensures that the size is the max classic size of IPv6 packt
-        err = bpf_skb_load_bytes(skb, ipv6_offset, (void *)sourceSymbol->packet, (size & 0xffff) + 1);
-    } else {
-        if (DEBUG) bpf_printk("Receiver: Wrong ipv6_offset\n");
-        return -1;
-    }
+    err = bpf_skb_load_bytes(skb, ipv6_offset, (void *)sourceSymbol->packet, ((skb->len - ipv6_offset - 1) & 0x1ff) + 1);
     if (err < 0) {
         if (DEBUG) bpf_printk("Receiver: impossible to load bytes from packet\n");
         return -1;
@@ -108,30 +94,22 @@ static __always_inline int storeRepairSymbol(struct __sk_buff *skb, struct repai
         if (DEBUG) bpf_printk("Receiver: cannot get passed the transport header\n");
         return -1;
     }
-    payload_pointer += 8 * sizeof(char);
+    payload_pointer += 8;
 
     /* Get the packet payload length */
-    __u32 payload_len = ((long)data_end) - ((long)payload_pointer);
-    if (payload_pointer + payload_len > data_end) {
-        if (DEBUG) bpf_printk("Receiver: inconsistent payload\n");
-        return -1;
-    }
+    __u32 payload_len = skb->len;
 
     /* Store the payload in repairSymbol->packet */
     __u32 payload_offset = (long)payload_pointer - (long)data;
     const __u16 size = payload_len - 1;
-    if (size < sizeof(repairSymbol->packet) && payload_offset + size <= (long)data_end) {
-        err = bpf_skb_load_bytes(skb, payload_offset, (void *)repairSymbol->packet, (size & 0xffff) + 1);
-    } else {
-        if (DEBUG) bpf_printk("Receiver: Wrong offset: %u %u %u\n", (size & 0xffff) + 1, sizeof(repairSymbol->packet), payload_offset);
-        return -1;
-    }
+
+    err = bpf_skb_load_bytes(skb, payload_offset, (void *)repairSymbol->packet, ((skb->len - payload_offset - 1) & 0x1ff) + 1);
     if (err < 0) {
         if (DEBUG) bpf_printk("Receiver: impossible to load bytes\n");
         return -1;
     }
 
-    repairSymbol->packet_length = payload_len;
+    repairSymbol->packet_length = payload_len - payload_offset;
 
     //if (DEBUG) bpf_printk("Receiver: stored the repair symbol!\n");
 

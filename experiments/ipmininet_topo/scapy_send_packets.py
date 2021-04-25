@@ -49,7 +49,7 @@ def send_packets_default(args) -> None:
 
     for i in range(int(args.number_packets)):
         pkt = craft_srv6_packet(args, payload_template())
-        send(pkt)
+        send(pkt, count=args.block)
         time.sleep(args.sleep_time)
 
         if args.verbose:
@@ -70,7 +70,7 @@ def send_packets_from_file(args) -> None:
         for i in range(nb_packets):
             packet_payload = all_payload[i * packet_size: (i+1) * packet_size]
             pkt = craft_srv6_packet(args, packet_payload)
-            send(pkt)
+            send(pkt, count=args.block)
             time.sleep(args.sleep_time)
 
             if args.verbose:
@@ -80,6 +80,7 @@ def send_packets_from_file(args) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description="Send Scapy packets for FEC SRv6 plugin")
+    parser.add_argument("-b", "--block", help="Number of packets per block", type=int, default=1)
     parser.add_argument("-n", "--number_packets", help="Number of packets to send", type=int, default=10)
     parser.add_argument("-s", "--segments", help="List of segments of the packet", nargs="+", default=["2042:22::2", "fc00::9", "fc00::d", "fc00::a"])
     parser.add_argument("-c", "--source", help="Source of the SRv6 packet", default="2042:aa::2")

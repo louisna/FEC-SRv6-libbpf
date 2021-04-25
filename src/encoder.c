@@ -54,6 +54,7 @@ static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz)
      */
     const struct repairSymbol_t *repairSymbol = (struct repairSymbol_t *)data;
     if (total % 10000 == 0) printf("CALL TRIGGERED!\n");
+    //printf("Repair symbol of length: %u\n", repairSymbol->packet_length);
     //printf("Information sur mon repair symbol: %u %u\n", repairSymbol->packet_length, repairSymbol->tlv[0]);
 
     ++total;
@@ -62,7 +63,8 @@ static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz)
 
 static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
     fecConvolution_t *fecConvolution = (fecConvolution_t *)data;
-    // printf("Call triggered: %d\n", fecConvolution->encodingSymbolID);
+    //printf("Call triggered: %d\n", fecConvolution->encodingSymbolID);
+    //printf("And the TLV value is: %u\n", fecConvolution->repairTlv.encodingSymbolID);
 
     /* Reset the content of the repair symbol from previous call */
     memset(rlc->repairSymbol, 0, sizeof(struct repairSymbol_t));
@@ -86,8 +88,8 @@ static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
 static void handle_events(int map_fd_events) {
     /* Define structure for the perf event */
     struct perf_buffer_opts pb_opts = {
-        //.sample_cb = fecScheme,
-        .sample_cb = send_repairSymbol_XOR,
+        .sample_cb = fecScheme,
+        //.sample_cb = send_repairSymbol_XOR,
     };
     struct perf_buffer *pb = NULL;
     int err;

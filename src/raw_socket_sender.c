@@ -122,7 +122,7 @@ int send_raw_socket(int sfd, const struct repairSymbol_t *repairSymbol, struct s
     uhdr->uh_sum = udp_checksum(uhdr, udp_length + pay_length, &src.sin6_addr, &dst.sin6_addr);
 
     /* Send packet */
-    bytes = sendto(sfd, packet, packet_length, 0, (struct sockaddr *)&dst, sizeof(dst));
+    bytes = sendto(sfd, packet, packet_length, 0, (struct sockaddr *)&drp, sizeof(drp));
     //++total;
     if (bytes != packet_length) {
         return -1;

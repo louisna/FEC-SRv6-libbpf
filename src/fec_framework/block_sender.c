@@ -22,17 +22,6 @@ struct {
 
 static __always_inline int fecFramework__block(struct __sk_buff *skb, void *csh_void, mapStruct_t *mapStruct, void *map) {
     int err;
-    __u16 sourceBlock = mapStruct->soubleBlock; 
-    __u16 sourceSymbolCount = mapStruct->sourceSymbolCount;
-
-    struct tlvSource__block_t *csh = (struct tlvSource__block_t *)csh_void;
-    
-    /* Complete the source symbol TLV */
-    memset(csh, 0, sizeof(struct tlvSource__block_t));
-    csh->tlv_type = TLV_CODING_SOURCE;
-    csh->len = sizeof(struct tlvSource__block_t) - 2; // Does not include tlv_type and len
-    csh->sourceBlockNb = sourceBlock;
-    csh->sourceSymbolNb = sourceSymbolCount;
 
     /* Load the source symbol structure to store the packet */
     struct sourceSymbol_t *sourceSymbol = &mapStruct->sourceSymbol;
@@ -51,6 +40,33 @@ static __always_inline int fecFramework__block(struct __sk_buff *skb, void *csh_
         return -1;
     }
 
+    bpf_spin_lock(&mapStruct->lock);
+
+    __u16 sourceBlock = mapStruct->soubleBlock; 
+    __u16 sourceSymbolCount = mapStruct->sourceSymbolCount;
+
+    struct tlvSource__block_t *csh = (struct tlvSource__block_t *)csh_void;
+    
+    /* Complete the source symbol TLV */
+    memset(csh, 0, sizeof(struct tlvSource__block_t));
+    csh->tlv_type = TLV_CODING_SOURCE;
+    csh->len = sizeof(struct tlvSource__block_t) - 2; // Does not include tlv_type and len
+    csh->sourceBlockNb = sourceBlock;
+    csh->sourceSymbolNb = sourceSymbolCount;
+
+    if (sourceSymbolCount == mapStruct->currentBlockSize - 1) {
+        ++sourceBlock; // Next packet will belong to another source block
+        sourceSymbolCount = 0;
+    } else {
+        ++sourceSymbolCount;
+    }
+
+    /* Update with new values */
+    mapStruct->soubleBlock = sourceBlock;
+    mapStruct->sourceSymbolCount = sourceSymbolCount;
+
+    bpf_spin_unlock(&mapStruct->lock);
+
     /* Call coding function. This function:
      * 1) Stores the source symbol for coding (or directly codes if XOR-on-the-line)
      * 2) Creates the repair symbols TLV if needed
@@ -58,7 +74,7 @@ static __always_inline int fecFramework__block(struct __sk_buff *skb, void *csh_
      *            -1 in case of error,
      *             2 if the packet cannot be protected,
      *             0 otherwise */
-    err = fecScheme__blockXOR(skb, mapStruct);
+    err = fecScheme__blockXOR(skb, mapStruct, sourceSymbolCount, sourceBlock);
     if (err < 0) { // Error
         if (DEBUG) bpf_printk("Sender fewFramework: error confirmed\n");
         return -1;
@@ -71,18 +87,6 @@ static __always_inline int fecFramework__block(struct __sk_buff *skb, void *csh_
     if (err == 1) {
         bpf_perf_event_output(skb, map, BPF_F_CURRENT_CPU, &mapStruct->repairSymbol, sizeof(struct repairSymbol_t));
     }
-    
-    /* Update index counts */
-    if (err == 1) { // Repair symbols must be sent
-        ++sourceBlock; // Next packet will belong to another source block
-        sourceSymbolCount = 0;
-    } else {
-        ++sourceSymbolCount;
-    }
-
-    /* Update with new values */
-    mapStruct->soubleBlock = sourceBlock;
-    mapStruct->sourceSymbolCount = sourceSymbolCount;
 
     return err;
 }

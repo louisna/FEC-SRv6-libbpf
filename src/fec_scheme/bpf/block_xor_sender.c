@@ -31,18 +31,16 @@ static __always_inline int xor_on_the_line(struct __sk_buff *skb, struct repairS
     repair_tlv->payload_len ^= sourceSymbol->packet_length;
 
     /* Get the maximum length of the source symbols as the length of the repair symbol */
+    //bpf_printk("Maximum packet length before: %u\n", repairSymbol->packet_length);
     repairSymbol->packet_length = MAX(repairSymbol->packet_length, sourceSymbol->packet_length); 
+    //bpf_printk("Maximum packet length=%u from %u\n", repairSymbol->packet_length, sourceSymbol->packet_length);
 
     return 0;
 }
 
-static __always_inline int fecScheme__blockXOR(struct __sk_buff *skb, mapStruct_t *mapStruct)  {
+static __always_inline int fecScheme__blockXOR(struct __sk_buff *skb, mapStruct_t *mapStruct, __u16 sourceSymbolCount, __u16 sourceBlock)  {
     int err;
     int k0 = 0;
-
-    __u16 sourceBlock = mapStruct->soubleBlock; 
-    __u16 sourceSymbolCount = mapStruct->sourceSymbolCount;
-    __u8 blockSize = mapStruct->currentBlockSize;
 
     /* Load the unique repair symbol pointer from map */
     struct repairSymbol_t *repairSymbol = &mapStruct->repairSymbol;
@@ -71,7 +69,7 @@ static __always_inline int fecScheme__blockXOR(struct __sk_buff *skb, mapStruct_
         repairTLV->sourceBlockNb = sourceBlock;
         repairTLV->repairSymbolNb = 0; // There is only one repair symbol
         repairTLV->nrs = 1;
-        repairTLV->nss = blockSize;
+        repairTLV->nss = mapStruct->currentBlockSize;
 
         return 1;
     }

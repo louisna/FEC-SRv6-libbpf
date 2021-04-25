@@ -16,7 +16,7 @@ static void rlc__get_coefs(tinymt32_t *prng, uint32_t seed, int n, uint8_t coefs
 
 static int rlc__generateRepairSymbols(fecConvolution_t *fecConvolution, encode_rlc_t *rlc) {
     uint16_t max_length = 0;
-    uint32_t encodingSymbolID = fecConvolution->encodingSymbolID;
+    uint32_t encodingSymbolID = fecConvolution->encodingSymbolID - 1;
     struct repairSymbol_t *repairSymbol = rlc->repairSymbol;
     uint8_t windowSize = fecConvolution->currentWindowSize;
     uint8_t windowSlide = fecConvolution->currentWindowSlide;
@@ -54,6 +54,7 @@ static int rlc__generateRepairSymbols(fecConvolution_t *fecConvolution, encode_r
         //printf("Source symbol #%d with idx=%u at index %d=%x with coef=%u\n", i, sourceBufferIndex, sourceBufferIndex, sourceSymbol->packet[142], coefs[i]);
 
         /* Encode the source symbol in the packet */
+        //printf("Source symbol packet length: %u\n", sourceSymbol->packet_length);
         symbol_add_scaled(repairSymbol->packet, coefs[i], sourceSymbol->packet, MAX_PACKET_SIZE, rlc->muls);
         symbol_add_scaled(&coded_length, coefs[i], &sourceSymbol->packet_length, sizeof(uint16_t), rlc->muls);
     }

@@ -20,14 +20,35 @@ struct {
     __type(value, fecConvolution_t);
 } fecConvolutionInfoMap SEC(".maps");
 
+typedef struct {
+    __u32 encodingSymbolID;
+    __u16 repairKey;
+    __u8 ringBuffSize; // Number of packets for next coding in the ring buffer
+    struct sourceSymbol_t sourceRingBuffer[RLC_BUFFER_SIZE];
+    struct tlvRepair__convo_t repairTlv;
+    __u8 currentWindowSize;
+    __u8 currentWindowSlide;
+} for_user_space_t;
+
 static __always_inline int fecFramework__convolution(struct __sk_buff *skb, void *tlv_void, fecConvolution_t *fecConvolution, void *map) {
     struct tlvSource__convo_t *tlv = (struct tlvSource__convo_t *)tlv_void;
     
     int ret;
+
+    /* Ensures that we do not try to protect a too big packet */
+    if (skb->len > MAX_PACKET_SIZE) {
+        return -1;
+    }
+
+    /* Update encodingSymbolID: wraps to zero after 2^32 - 1 */
+    bpf_spin_lock(&fecConvolution->lock);
     __u32 encodingSymbolID = fecConvolution->encodingSymbolID;
     __u8 repairKey = fecConvolution->repairKey;
     __u8 ringBuffSize = fecConvolution->ringBuffSize;
     __u8 windowSize = fecConvolution->currentWindowSize;
+    fecConvolution->encodingSymbolID = encodingSymbolID + 1;
+    bpf_spin_unlock(&fecConvolution->lock);
+
     __u8 DT = 15; // TODO find good value
 
     //bpf_printk("Valeur de dinwod size=%u et %u\n", windowSize, (MAX_RLC_WINDOW_SIZE - 1));
@@ -36,6 +57,7 @@ static __always_inline int fecFramework__convolution(struct __sk_buff *skb, void
     tlv->tlv_type = TLV_CODING_SOURCE; // TODO: other value to distinguish ??
     tlv->len = sizeof(struct tlvSource__convo_t) - 2;
     tlv->encodingSymbolID = encodingSymbolID;
+    //bpf_printk("Send packet with encodingSymbolID=%u and repairKey=%u\n", encodingSymbolID, repairKey);
 
     /* Get pointer in the ring buffer to store the source symbol */
     __u32 ringBufferIndex = encodingSymbolID % windowSize;
@@ -64,7 +86,7 @@ static __always_inline int fecFramework__convolution(struct __sk_buff *skb, void
     ++ringBuffSize;
 
     /* Call coding function */
-    ret = fecScheme__convoRLC(skb, fecConvolution, ringBuffSize);
+    ret = fecScheme__convoRLC(skb, fecConvolution, ringBuffSize, encodingSymbolID);
     if (ret < 0) {
         return -1;
     }
@@ -73,16 +95,14 @@ static __always_inline int fecFramework__convolution(struct __sk_buff *skb, void
      * Forward all data to user space for computation for now as we cannot perform that is the kernel
      * due to the current limitations */
     if (ret) {
+        for_user_space_t *to_user_space = (for_user_space_t *)fecConvolution;
         //bpf_printk("Send data to user space for repair symbol generation\n");
-        bpf_perf_event_output(skb, map, BPF_F_CURRENT_CPU, fecConvolution, sizeof(fecConvolution_t));
+        bpf_perf_event_output(skb, map, BPF_F_CURRENT_CPU, fecConvolution, sizeof(for_user_space_t));
     } else {
         fecConvolution->ringBuffSize = ringBuffSize; // The value is updated by the FEC Scheme if we generate repair symbols
     }
 
     // bpf_printk("Sender: will forward packet with encodingSymbolID=%u\n", encodingSymbolID);
-
-    /* Update encodingSymbolID: wraps to zero after 2^32 - 1 */
-    fecConvolution->encodingSymbolID = encodingSymbolID + 1;
 
     return 0;
 }

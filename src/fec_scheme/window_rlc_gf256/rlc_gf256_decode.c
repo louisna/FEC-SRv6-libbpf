@@ -283,7 +283,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
     uint8_t **constant_terms = malloc(nb_unknowns * sizeof(uint8_t *)); // independent term = b
     memset(constant_terms, 0, nb_unknowns * sizeof(uint8_t *));
     bool *undetermined = malloc(nb_unknowns * sizeof(bool)); // Indicates which (lost) source symbols could not be recovered
-    memset(undetermined, 0, sizeof(nb_unknowns * sizeof(bool)));
+    memset(undetermined, 0, nb_unknowns * sizeof(bool));
 
     for (int i = 0 ; i < n_eq ; i++) {
         system_coefs[i] = malloc(nb_unknowns);
@@ -383,19 +383,26 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
             memset(recovered, 0, sizeof(recoveredSource_t));
             recovered->encodingSymbolID = id_first_ss_first_window + idx;
             memcpy(recovered->packet, unknowns[current_unknown], MAX_PACKET_SIZE);
-            memcpy(&recovered->packet_length, unknowns[current_unknown] + MAX_PACKET_SIZE, 2);
+            memcpy(&recovered->packet_length, unknowns[current_unknown] + MAX_PACKET_SIZE, sizeof(uint16_t));
+            //printf("Recovered packet from %u to %u\n", unknowns[current_unknown] + MAX_PACKET_SIZE, recovered->packet_length);
 
-            /* Add the recovered packet in the recovered buffer */
-            int bufferIdx = recovered->encodingSymbolID % RLC_RECEIVER_BUFFER_SIZE;
-            if (rlc->recoveredSources[bufferIdx]) free(rlc->recoveredSources[bufferIdx]);
-            rlc->recoveredSources[recovered->encodingSymbolID % RLC_RECEIVER_BUFFER_SIZE] = recovered;
             // TODO: get the length also
             // TODO: send the packet
             //print_recovered(recovered);
             ++total_recovered;
-            //printf("Recovered source symbols with ID=%u, total recovered=%d\n", recovered->encodingSymbolID, total_recovered);
-            send_raw_socket_recovered(sfd, recovered, local_addr);
-            
+            printf("Recovered source symbols with ID=%u, total recovered=%d\n", recovered->encodingSymbolID, total_recovered);
+            err = send_raw_socket_recovered(sfd, recovered, local_addr);
+            if (err < 0) {
+                fprintf(stderr, "Error during sending the packet, drop\n");
+                free(recovered);
+            } else {
+                //printf("Sent recovered packet\n");
+
+                /* Add the recovered packet in the recovered buffer */
+                int bufferIdx = recovered->encodingSymbolID % RLC_RECEIVER_BUFFER_SIZE;
+                if (rlc->recoveredSources[bufferIdx]) free(rlc->recoveredSources[bufferIdx]);
+                rlc->recoveredSources[recovered->encodingSymbolID % RLC_RECEIVER_BUFFER_SIZE] = recovered;
+            }
         }
         free(unknowns[current_unknown++]);
     }

@@ -1,0 +1,18 @@
+rA ip -6 route del 2042:22::2/64 &&  ip -6 route add 2042:22::2/64 encap seg6 mode inline segs fc00::a,fc00::d,fc00::9 dev rA-eth0
+rA ip -6 route add 2042:22::2/64 encap seg6 mode inline segs fc00::a,fc00::d,fc00::9 dev rA-eth0
+
+rA ip -6 route del 2042:22::2/64 &&  ip -6 route add 2042:22::2/64 encap seg6 mode inline segs fc00::d,2042:2c::2 dev rA-eth0
+
+r1 ip -6 route del fc00::d && ip -6 route add fc00::d encap seg6local action End.BPF endpoint fd /sys/fs/bpf/drop/lwt_seg6local section drop dev r1-eth1
+r1 ip -6 route add fc00::d encap seg6local action End.BPF endpoint fd /sys/fs/bpf/drop/lwt_seg6local section drop dev r1-eth1
+
+hA /home/vagrant/go/bin/mqtt-benchmark --broker tcp://[2042:22::2]:1883 --clients 20 --count 10
+
+rE ip -6 route del fc00::a && ip -6 route add fc00::a encap seg6local action End.BPF endpoint fd /sys/fs/bpf/encoder/lwt_seg6local section decode dev rE-eth0
+rE ip -6 route add fc00::a encap seg6local action End.BPF endpoint fd /sys/fs/bpf/encoder/lwt_seg6local section decode dev rE-eth0
+
+r2 ip -6 route add fc00::9 encap seg6local action End.BPF endpoint fd /sys/fs/bpf/decoder/lwt_seg6local section decode dev r2-eth1
+r2 ip -6 route del fc00::9 && ip -6 route add fc00::9 encap seg6local action End.BPF endpoint fd /sys/fs/bpf/decoder/lwt_seg6local section decode dev r2-eth1
+
+rC ip -6 route add fc00::9 encap seg6local action End.BPF endpoint fd /sys/fs/bpf/decoder/lwt_seg6local section decode dev rC-eth1
+rC ip -6 route del fc00::9 && ip -6 route add fc00::9 encap seg6local action End.BPF endpoint fd /sys/fs/bpf/decoder/lwt_seg6local section decode dev rC-eth1
