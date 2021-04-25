@@ -19,7 +19,7 @@ static int rlc__generateRepairSymbols(fecConvolution_t *fecConvolution, encode_r
     uint32_t encodingSymbolID = fecConvolution->encodingSymbolID - 1;
     struct repairSymbol_t *repairSymbol = rlc->repairSymbol;
     uint8_t windowSize = fecConvolution->currentWindowSize;
-    uint8_t windowSlide = fecConvolution->currentWindowSlide;
+    //uint8_t windowSlide = fecConvolution->currentWindowSlide;
     //printf("size=%d, slide=%d\n", windowSize, windowSlide);
 
     tinymt32_t prng;
@@ -75,13 +75,13 @@ static int rlc__generateRepairSymbols(fecConvolution_t *fecConvolution, encode_r
 }
 
 encode_rlc_t *initialize_rlc() {
-    encode_rlc_t *rlc = malloc(sizeof(encode_rlc_t));
-    if (!rlc) return NULL;
+    encode_rlc_t *my_rlc = malloc(sizeof(encode_rlc_t));
+    if (!my_rlc) return NULL;
 
     /* Create and fill in the products */
     uint8_t *muls = malloc(256 * 256 * sizeof(uint8_t));
     if (!muls) {
-        free(rlc);
+        free(my_rlc);
         return NULL;
     }
     for (int i = 0; i < 256; ++i) {
@@ -89,18 +89,19 @@ encode_rlc_t *initialize_rlc() {
             muls[i * 256 + j] = gf256_mul_formula(i, j);
         }
     }
-    rlc->muls = muls;
+    my_rlc->muls = muls;
 
     /* Create and set the repair symbol */
     struct repairSymbol_t *repairSymbol = malloc(sizeof(struct repairSymbol_t));
     if (!repairSymbol) {
         free(muls);
-        free(rlc);
+        free(my_rlc);
+        return NULL;
     }
     memset(repairSymbol, 0, sizeof(struct repairSymbol_t));
-    rlc->repairSymbol = repairSymbol;
+    my_rlc->repairSymbol = repairSymbol;
 
-    return rlc;
+    return my_rlc;
 }
 
 void free_rlc(encode_rlc_t *rlc) {

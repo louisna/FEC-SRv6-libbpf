@@ -114,7 +114,7 @@ void gaussElimination(int n_eq, int n_unknowns, uint8_t **a, uint8_t *constant_t
     int candidate = n_unknowns - 1;
     for (i = n_eq - 1; i >= 0; --i) {
         bool only_zeroes = true;
-        for (int j = 0; j < n_unknowns; ++j) {
+        for (j = 0; j < n_unknowns; ++j) {
             if (a[i][j] != 0) {
                 only_zeroes = false;
                 break;
@@ -129,7 +129,7 @@ void gaussElimination(int n_eq, int n_unknowns, uint8_t **a, uint8_t *constant_t
                 break;
             }
             memcpy(x[candidate], constant_temps[i], symbol_size);
-            for (int j = 0; j < candidate; ++j) {
+            for (j = 0; j < candidate; ++j) {
                 if (a[i][j] != 0) {
                     undetermined[candidate] = true;
                     break;
@@ -243,7 +243,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
             memcpy(source_symbols_array[i] + MAX_PACKET_SIZE, &fecConvolution->sourceRingBuffer[idx].packet_length, sizeof(uint16_t));
             //printf("Source symbol #%d at index %d=%x\n", i, 137, source_symbols_array[i][137]);
         } else if (rlc->recoveredSources[idx] && rlc->recoveredSources[idx]->encodingSymbolID == theoric_id) {
-            source_symbols_array[i] = malloc(MAX_PACKET_SIZE);
+            source_symbols_array[i] = malloc(decoding_size);
             memset(source_symbols_array[i], 0, decoding_size);
             memcpy(source_symbols_array[i], rlc->recoveredSources[idx]->packet, MAX_PACKET_SIZE);
             memcpy(source_symbols_array[i] + MAX_PACKET_SIZE, &rlc->recoveredSources[idx]->packet_length, sizeof(uint16_t));
@@ -378,7 +378,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
     int err = 0;
     for (int j = 0; j < nb_unknowns; ++j) {
         int idx = unknowns_idx[j];
-        if (can_recover && !source_symbols_array[idx] && !undetermined[idx] && !symbol_is_zero(unknowns[current_unknown], MAX_PACKET_SIZE)) {
+        if (can_recover && !source_symbols_array[idx] && !undetermined[current_unknown] && !symbol_is_zero(unknowns[current_unknown], MAX_PACKET_SIZE)) {
             recoveredSource_t *recovered = malloc(sizeof(recoveredSource_t));
             memset(recovered, 0, sizeof(recoveredSource_t));
             recovered->encodingSymbolID = id_first_ss_first_window + idx;
@@ -414,11 +414,11 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
             free(constant_terms[i]);
         }
     }
-    for (int i = 0; i < source_symbol_nb; ++i) {
+    for (i = 0; i < source_symbol_nb; ++i) {
         if (source_symbols_array[i])
             free(source_symbols_array[i]);
     }
-    for (int i = 0; i < effective_window_check; ++i) {
+    for (i = 0; i < effective_window_check; ++i) {
         if (repair_symbols_array[i])
             free(repair_symbols_array[i]);
     }
@@ -430,20 +430,21 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
     free(coefs);
     free(undetermined);
     free(unknowns_idx);
+    free(missing_indexes);
     return err;
 }
 
 
 decode_rlc_t *initialize_rlc_decode() {
-    decode_rlc_t *rlc = malloc(sizeof(decode_rlc_t));
-    if (!rlc) return 0;
+    decode_rlc_t *my_rlc = malloc(sizeof(decode_rlc_t));
+    if (!my_rlc) return 0;
 
-    memset(rlc, 0, sizeof(decode_rlc_t));
+    memset(my_rlc, 0, sizeof(decode_rlc_t));
 
     /* Create and fill the products */
     uint8_t *muls = malloc(256 * 256 * sizeof(uint8_t));
     if (!muls) {
-        free(rlc);
+        free(my_rlc);
         return 0;
     }
     memset(muls, 0, 256 * 256 * sizeof(uint8_t));
@@ -452,20 +453,20 @@ decode_rlc_t *initialize_rlc_decode() {
             muls[i * 256 + j] = gf256_mul_formula(i, j);
         }
     }
-    rlc->muls = muls;
+    my_rlc->muls = muls;
 
     /* Create and set the inverse muls array */
     uint8_t *table_inv = malloc(256 * sizeof(uint8_t));
     if (!table_inv) {
         free(muls);
-        free(rlc);
+        free(my_rlc);
         return 0;
     }
     memset(table_inv, 0, 256 * sizeof(uint8_t));
     assign_inv(table_inv);
-    rlc->table_inv = table_inv;
+    my_rlc->table_inv = table_inv;
 
-    return rlc;
+    return my_rlc;
 }
 
 void free_rlc_decode(decode_rlc_t *rlc) {

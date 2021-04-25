@@ -112,7 +112,7 @@ static __always_inline int drop_markov_model() {
             return BPF_OK;
         } else {
             markov->current_state = 1;
-            //bpf_printk("Drop intercepted #%d\n", markov->intercepted - 1);
+            bpf_printk("Drop intercepted #%d\n", markov->intercepted - 1);
             return BPF_DROP;
         }
     } else {
@@ -121,7 +121,7 @@ static __always_inline int drop_markov_model() {
             return BPF_OK;
         } else {
             markov->current_state = 1;
-            //bpf_printk("Drop intercepted #%d\n", markov->intercepted - 1);
+            bpf_printk("Drop intercepted #%d\n", markov->intercepted - 1);
             return BPF_DROP;
         }
     }
@@ -133,8 +133,8 @@ int drop(struct __sk_buff *skb) {
     //int id_to_drop[] = {2, 3, 5, -1, -1, -1, -1, -1, -1, -1}; // Test for (4, 2) with 3 loss
     int id_to_drop[] = {8, 3, 4, -1, -1, -1, -1, -1, -1, -1}; // Test for (4, 2) with 3 loss
     //int id_to_drop[] = {2, 14, 19, -1, -1, -1, -1, -1, -1, -1}; // Test for (4, 2) with 3 loss
-    return drop_predefined(id_to_drop);
-    //return drop_markov_model();
+    //return drop_predefined(id_to_drop);
+    return drop_markov_model();
 }
 
 char LICENSE[] SEC("license") = "GPL";
