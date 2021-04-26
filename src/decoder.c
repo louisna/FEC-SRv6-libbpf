@@ -74,7 +74,7 @@ int globalCount = 0;
 
 static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
     fecConvolution_t *fecConvolution = (fecConvolution_t *)data;
-    printf("Call triggered: %d\n", fecConvolution->encodingSymbolID);
+    //printf("Call triggered: %d\n", fecConvolution->encodingSymbolID);
 
     //debug_print(fecConvolution);
 

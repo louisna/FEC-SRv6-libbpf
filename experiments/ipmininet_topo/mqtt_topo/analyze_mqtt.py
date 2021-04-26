@@ -43,8 +43,8 @@ def read_mqtt_run_json(filename):
     return np.median(clients_res)
 
 def analyze_latency():
-    _, _, filenames_without = next(os.walk("results_without/"))
-    _, _, filenames_with = next(os.walk("results_with/"))
+    _, _, filenames_without = next(os.walk("results_without_auto/"))
+    _, _, filenames_with = next(os.walk("results_rlc/"))
     # print(filenames_without)
 
     res_without = list()
@@ -52,13 +52,15 @@ def analyze_latency():
 
     # I forgot to use JSON format so I need to scrapt like a n00b
     for filename in tqdm(sorted(filenames_without)):
-        path = os.path.join("results_without", filename)
+        path = os.path.join("results_without_auto", filename)
         res_without.append(read_mqtt_run_json(path))
 
     # The same but for RLC
     for filename in tqdm(filenames_with):
-        path = os.path.join("results_with", filename)
+        path = os.path.join("results_rlc", filename)
         res_rlc.append(read_mqtt_run_json(path))
+    
+    print([int(i) for i in res_without if i > 50])
 
     """res_without = [
         22.247950109999998,
@@ -86,15 +88,15 @@ def analyze_latency():
         23.764407795,
     ]"""
 
-    hist_without, bin_edges_without = np.histogram(res_without, bins=60, range=(21, 53), density=True)
-    hist_with, bin_edges_with = np.histogram(res_rlc, bins=60, range=(21, 53), density=True)
+    hist_without, bin_edges_without = np.histogram(res_without, bins=60, range=(20, 58), density=True)
+    hist_with, bin_edges_with = np.histogram(res_rlc, bins=60, range=(20, 58), density=True)
     dx = bin_edges_without[1] - bin_edges_without[0]
     cdf_without = np.cumsum(hist_without) * dx
     cdf_with = np.cumsum(hist_with) * dx
 
     fig, ax = plt.subplots()
-    ax.plot(bin_edges_without[1:], cdf_without, label="SRv6", color=(173/255, 205/255, 224/255), linestyle="-")
-    ax.plot(bin_edges_with[1:], cdf_with, label="SRv6_FEC_RLC_4_2", color=(43/255, 68/255, 148/255), linestyle="-.")
+    ax.plot(bin_edges_without[1:], cdf_without, label="TCP", color=(173/255, 205/255, 224/255), linestyle="-")
+    ax.plot(bin_edges_with[1:], cdf_with, label="SRv6_FEC_RLC_6_3", color=(43/255, 68/255, 148/255), linestyle="-.")
 
     ax.grid(axis="y")
     ax.set_axisbelow(True)
@@ -104,8 +106,8 @@ def analyze_latency():
     # plt.gca().xaxis.set_major_formatter(PercentFormatter(1))
 
     plt.legend(loc="best")
-    plt.savefig("mqtt.svg")
-    plt.savefig("mqtt.png")
+    plt.savefig("mqtt_latency.svg")
+    plt.savefig("mqtt_latency.png")
     plt.show()
 
 

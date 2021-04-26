@@ -28,7 +28,7 @@ def craft_srv6_packet(args, payload) -> IPv6:
         pkt = pkt / srh
 
     # Transport layer
-    transport = UDP(sport=123, dport=4444)
+    transport = UDP(sport=123, dport=args.port)
     pkt = pkt / transport
 
     # Payload
@@ -82,12 +82,13 @@ def main():
     parser = argparse.ArgumentParser(description="Send Scapy packets for FEC SRv6 plugin")
     parser.add_argument("-b", "--block", help="Number of packets per block", type=int, default=1)
     parser.add_argument("-n", "--number_packets", help="Number of packets to send", type=int, default=10)
-    parser.add_argument("-s", "--segments", help="List of segments of the packet", nargs="+", default=["2042:22::2", "fc00::9", "fc00::d", "fc00::a"])
+    parser.add_argument("-s", "--segments", help="List of segments of the packet", nargs="+", default=["2042:22::2", "fc00::9", "fc00::a"])
     parser.add_argument("-c", "--source", help="Source of the SRv6 packet", default="2042:aa::2")
     parser.add_argument("-t", "--sleep_time", help="Time in seconds between two consecutive packets", type=float, default=0.001)
     parser.add_argument("-f", "--file", help="Input file to find the payload. First=filename, second=packet size", nargs="+", default=None)
     parser.add_argument("-v", "--verbose", help="Print debug messages", action="store_true")
     parser.add_argument("-d", "--destination", help="Packet destination if no segments", type=str, default=None)
+    parser.add_argument("--port", help="destination port", type=int, default=4444)
     args = parser.parse_args()
 
     print(args, file=sys.stderr)
