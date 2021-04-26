@@ -11,8 +11,8 @@
 #include "encoder.skel.h"
 #include <bpf/bpf.h>
 #include "encoder.h"
-#include "fec_scheme/window_rlc_gf256/rlc_gf256.c"
 #include "raw_socket_sender.c"
+#include "fec_scheme/window_rlc_gf256/rlc_gf256.c"
 
 static volatile int sfd = -1;
 static volatile int first_sfd = 1;
@@ -66,22 +66,19 @@ static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
     //printf("Call triggered: %d\n", fecConvolution->encodingSymbolID);
     //printf("And the TLV value is: %u\n", fecConvolution->repairTlv.encodingSymbolID);
 
-    /* Reset the content of the repair symbol from previous call */
-    memset(rlc->repairSymbol, 0, sizeof(struct repairSymbol_t));
-
     /* Generate the repair symbol */
-    int err = rlc__generateRepairSymbols(fecConvolution, rlc);
+    int err = rlc__generate_repair_symbols(fecConvolution, rlc, sfd, &src, &dst);
     if (err < 0) {
         printf("ERROR. TODO: handle\n");
         return;
     }
 
     /* Send the repair symbol */
-    err = send_raw_socket(sfd, rlc->repairSymbol, src, dst);
+    //err = send_raw_socket(sfd, rlc->repairSymbol, src, dst);
     //printf("%d", err);
-    if (err < 0) {
-        perror("Impossible to send packet");
-    }
+    //if (err < 0) {
+    //    perror("Impossible to send packet");
+    //}
     return;
 }
 
@@ -186,8 +183,8 @@ int main(int argc, char *argv[]) {
     struct bpf_map *map_fecConvolutionBuffer = skel->maps.fecConvolutionInfoMap;
     int map_fd_fecConvolutionBuffer = bpf_map__fd(map_fecConvolutionBuffer);
     fecConvolution_t convo_init = {0};
-    convo_init.currentWindowSize = 6; // TODO: here MIN(...)
-    convo_init.currentWindowSlide = 3;
+    convo_init.currentWindowSize = 4; // TODO: here MIN(...)
+    convo_init.currentWindowSlide = 2;
     bpf_map_update_elem(map_fd_fecConvolutionBuffer, &k0, &convo_init, BPF_ANY);
 
     struct bpf_map *map_events = skel->maps.events;

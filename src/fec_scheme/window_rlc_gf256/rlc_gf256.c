@@ -14,11 +14,15 @@ static void rlc__get_coefs(tinymt32_t *prng, uint32_t seed, int n, uint8_t coefs
     }
 }
 
-static int rlc__generateRepairSymbols(fecConvolution_t *fecConvolution, encode_rlc_t *rlc) {
+static int rlc__generate_a_repair_symbol(fecConvolution_t *fecConvolution, encode_rlc_t *rlc, int idx) {
     uint16_t max_length = 0;
     uint32_t encodingSymbolID = fecConvolution->encodingSymbolID - 1;
     struct repairSymbol_t *repairSymbol = rlc->repairSymbol;
+    memset(repairSymbol, 0, sizeof(struct repairSymbol_t));
     uint8_t windowSize = fecConvolution->currentWindowSize;
+    printf("Passage 1\n");
+    struct tlvRepair__convo_t *tlv = (struct tlvRepair__convo_t *)&fecConvolution->repairTlv[idx];
+    uint16_t repairKey = tlv->repairFecInfo & 0xff;
     //uint8_t windowSlide = fecConvolution->currentWindowSlide;
     //printf("size=%d, slide=%d\n", windowSize, windowSlide);
 
@@ -30,11 +34,12 @@ static int rlc__generateRepairSymbols(fecConvolution_t *fecConvolution, encode_r
     uint8_t *coefs = malloc(sizeof(uint8_t) * windowSize);
     if (!coefs) return -1;
 
-    rlc__get_coefs(&prng, fecConvolution->repairKey, windowSize, coefs);
+    rlc__get_coefs(&prng, repairKey, windowSize, coefs);
     //printf("repairKey is %d\n", fecConvolution->repairKey);
     //for (int jj = 0; jj < windowSize; ++jj) {
     //    printf("Valeur du coef: %d\n", coefs[jj]);
     //}
+    printf("Passage 1\n");
 
     for (uint8_t i = 0; i < windowSize; ++i) {
         /* Get the source symbol in order in the window */
@@ -58,19 +63,40 @@ static int rlc__generateRepairSymbols(fecConvolution_t *fecConvolution, encode_r
         symbol_add_scaled(repairSymbol->packet, coefs[i], sourceSymbol->packet, MAX_PACKET_SIZE, rlc->muls);
         symbol_add_scaled(&coded_length, coefs[i], &sourceSymbol->packet_length, sizeof(uint16_t), rlc->muls);
     }
+    printf("Passage 1\n");
 
     /* Now add and complete the TLV */
-    memcpy(&repairSymbol->tlv, &fecConvolution->repairTlv, sizeof(struct tlvRepair__convo_t));
+    memcpy(&repairSymbol->tlv, tlv, sizeof(struct tlvRepair__convo_t));
+    printf("Passage 3\n");
 
     /* Also add the remaining parameter */
-    struct tlvRepair__convo_t *tlv = (struct tlvRepair__convo_t *)&repairSymbol->tlv;
-    tlv->coded_payload_len = coded_length; // Get the coded length here
+    struct tlvRepair__convo_t *tlv_rs = (struct tlvRepair__convo_t *)&repairSymbol->tlv;
+    tlv_rs->coded_payload_len = coded_length; // Get the coded length here
+    printf("Passage 2\n");
 
     /* And finally the length of the repair symbol is the maximum length instead of the coded length */
     repairSymbol->packet_length = max_length;
+    printf("Passage 4\n");
 
     free(coefs);
+    printf("Passage 1\n");
     
+    return 0;
+}
+
+int rlc__generate_repair_symbols(fecConvolution_t *fecConvolution, encode_rlc_t *rlc, int sfd, struct sockaddr_in6 *src, struct sockaddr_in6 *dst) {
+    int err;
+    for (int i = 0; i < RLC_RS_NUMBER; ++i) {
+        // Generate repair symbol #i
+        printf("Enter here\n");
+        rlc__generate_a_repair_symbol(fecConvolution, rlc, i);
+        struct repairSymbol_t *repairSymbol = rlc->repairSymbol;
+        printf("Send raw socket\n");
+        err = send_raw_socket(sfd, repairSymbol, *src, *dst);
+        if (err < 0) {
+            perror("Cannot send repair symbol");
+        }
+    }
     return 0;
 }
 

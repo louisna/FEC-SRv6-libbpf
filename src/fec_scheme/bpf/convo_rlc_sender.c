@@ -19,18 +19,19 @@ static __always_inline int fecScheme__convoRLC(struct __sk_buff *skb, fecConvolu
 
     /* Compute the repair symbol if needed */
     if (newRingBuffSize == windowSize) {
-        ++repairKey;
-        /* Start to complete the TLV for the repair symbol. The remaining will be done in US */
-        struct tlvRepair__convo_t *repairTlv = (struct tlvRepair__convo_t *)&fecConvolution->repairTlv;
-        // memset(repairTlv, 0, sizeof(tlvRepair__convo_t));
-        repairTlv->tlv_type = TLV_CODING_REPAIR; // TODO: change also ?
-        repairTlv->len = sizeof(struct tlvRepair__convo_t) - 2;
-        repairTlv->unused = 0;
-        repairTlv->encodingSymbolID = encodingSymbolID; // Set to the value of the last source symbol of the window
-        repairTlv->repairFecInfo = (windowSlide << 8) + repairKey;
-        repairTlv->nss = windowSize;
-        repairTlv->nrs = 1;
-
+        for (int i = 0; i < RLC_RS_NUMBER; ++i) {
+            ++repairKey;
+            /* Start to complete the TLV for the repair symbol. The remaining will be done in US */
+            struct tlvRepair__convo_t *repairTlv = (struct tlvRepair__convo_t *)&fecConvolution->repairTlv[i];
+            // memset(repairTlv, 0, sizeof(tlvRepair__convo_t));
+            repairTlv->tlv_type = TLV_CODING_REPAIR; // TODO: change also ?
+            repairTlv->len = sizeof(struct tlvRepair__convo_t) - 2;
+            repairTlv->unused = 0;
+            repairTlv->encodingSymbolID = encodingSymbolID; // Set to the value of the last source symbol of the window
+            repairTlv->repairFecInfo = (windowSlide << 8) + repairKey;
+            repairTlv->nss = windowSize;
+            repairTlv->nrs = RLC_RS_NUMBER;
+        }
         /* Reset parameters for the next window */
         fecConvolution->ringBuffSize = newRingBuffSize - windowSlide; // For next window, already some symbols
         fecConvolution->repairKey = repairKey; // Increment the repair key seed

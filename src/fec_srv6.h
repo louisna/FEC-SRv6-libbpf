@@ -32,6 +32,7 @@ struct tlvRepair__block_t {
 /* Convolutional FEC FRamework */
 #define MAX_RLC_WINDOW_SIZE 8
 #define MAX_RLC_WINDOW_SLIDE 4
+#define MAX_RLC_REPAIR_GEN 8
 
 struct tlvSource__convo_t {
     __u8 tlv_type;

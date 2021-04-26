@@ -25,7 +25,7 @@ typedef struct {
     __u16 repairKey;
     __u8 ringBuffSize; // Number of packets for next coding in the ring buffer
     struct sourceSymbol_t sourceRingBuffer[RLC_BUFFER_SIZE];
-    struct tlvRepair__convo_t repairTlv;
+    struct tlvRepair__convo_t repairTlv[RLC_RS_NUMBER];
     __u8 currentWindowSize;
     __u8 currentWindowSlide;
 } for_user_space_t;

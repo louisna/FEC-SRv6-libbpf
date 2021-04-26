@@ -7,6 +7,7 @@
 #define DEBUG 0
 
 #define RLC_BUFFER_SIZE MAX_RLC_WINDOW_SIZE
+#define RLC_RS_NUMBER 1
 
 /* Structures */
 struct sourceSymbol_t {
@@ -35,7 +36,7 @@ typedef struct fecConvolution {
     __u16 repairKey;
     __u8 ringBuffSize; // Number of packets for next coding in the ring buffer
     struct sourceSymbol_t sourceRingBuffer[RLC_BUFFER_SIZE];
-    struct tlvRepair__convo_t repairTlv;
+    struct tlvRepair__convo_t repairTlv[RLC_RS_NUMBER];
     __u8 currentWindowSize;
     __u8 currentWindowSlide;
     struct bpf_spin_lock lock;
