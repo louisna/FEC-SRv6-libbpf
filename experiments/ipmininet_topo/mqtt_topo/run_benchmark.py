@@ -52,7 +52,7 @@ print('Press Ctrl+C')
 
 #output_dir_template = lambda: f"/Volumes/LOUIS/thesis/results_without/mqtt_res_run_{i}.json"
 output_dir_template = lambda: f"mqtt_topo/results_rlc_3/mqtt_res_run_{i}.json"
-mqtt_bench_template = f"/home/vagrant/go/bin/mqtt-benchmark --broker tcp://[2042:cc::1]:1883 --clients 3 --count 200 --format json"
+mqtt_bench_template = f"/home/vagrant/go/bin/mqtt-benchmark --broker tcp://[2042:cc::1]:1883 --clients 10 --count 200 --format json"
 
 scapy_args = Crafting(verbose=False, source="2042:aa::1", destination="fc00::9", port=3333)
 

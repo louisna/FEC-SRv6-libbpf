@@ -7,12 +7,30 @@
 #include <strings.h>
 #include <sys/resource.h>
 #include <errno.h>
+#include <getopt.h>
 #include <bpf/libbpf.h>
 #include "encoder.skel.h"
 #include <bpf/bpf.h>
 #include "encoder.h"
 #include "raw_socket_sender.c"
 #include "fec_scheme/window_rlc_gf256/rlc_gf256.c"
+
+enum fec_framework {
+    CONVO = 0,
+    BLOCK = 1,
+};
+
+typedef struct {
+    char encoder_ip[48];
+    char decoder_ip[48];
+    enum fec_framework framework;
+    uint8_t block_size;
+    uint8_t window_size;
+    uint8_t window_slide;
+    bool attach;
+    char interface[15];
+} args_t;
+
 
 static volatile int sfd = -1;
 static volatile int first_sfd = 1;
@@ -82,12 +100,15 @@ static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
     return;
 }
 
-static void handle_events(int map_fd_events) {
+static void handle_events(int map_fd_events, enum fec_framework framework) {
     /* Define structure for the perf event */
-    struct perf_buffer_opts pb_opts = {
-        .sample_cb = fecScheme,
-        //.sample_cb = send_repairSymbol_XOR,
-    };
+    struct perf_buffer_opts pb_opts = {0};
+    if (framework == BLOCK) {
+        pb_opts.sample_cb = send_repairSymbol_XOR;
+    } else {
+        pb_opts.sample_cb = fecScheme;
+    }
+
     struct perf_buffer *pb = NULL;
     int err;
 
@@ -114,19 +135,111 @@ cleanup:
     perf_buffer__free(pb);
 }
 
-int main(int argc, char *argv[]) {
-    struct encoder_bpf *skel;
-    int err;
+void usage(char *prog_name) {
+    fprintf(stderr, "USAGE:\n");
+    fprintf(stderr, "   %s", prog_name);
+}
 
-    if (argc != 3) {
-        fprintf(stderr, "Usage: ./encoder <encoder_addr> <decoder_addr>");
-        return -1;
+int parse_args(args_t *args, int argc, char *argv[]) {
+    memset(args, 0, sizeof(args_t));
+    // Default values
+    strcpy(args->encoder_ip, "fc00::a");
+    strcpy(args->decoder_ip, "fc00::9");
+    args->framework = CONVO;
+    args->block_size = 3;
+    args->window_size = 4;
+    args->window_slide = 2;
+    args->attach = false;
+
+    bool interface_if_attach = false;
+
+    int opt;
+    while ((opt = getopt(argc, argv, "f:e:d:b:w:s:ai:")) != -1) {
+        switch (opt) {
+            case 'f':
+                if (strncmp(optarg, "block", 6) == 0) {
+                    args->framework = BLOCK;
+                } else if (strncmp(optarg, "convo", 6) == 0) {
+                    args->framework = CONVO;
+                } else {
+                    fprintf(stderr, "Wrong FEC Framework: %s\n", optarg);
+                    return -1;
+                }
+                break;
+            case 'e':
+                if (strlen(optarg) > 48) {
+                    fprintf(stderr, "Wrong encoder IPv6 address: %s\n", optarg);
+                    return -1;
+                }
+                strncpy(args->encoder_ip, optarg, 48);
+                break;
+            case 'd':
+                if (strlen(optarg) > 48) {
+                    fprintf(stderr, "Wrong decoder IPv6 address: %s\n", optarg);
+                    return -1;
+                }
+                strncpy(args->decoder_ip, optarg, 48);
+                break;
+            case 'b':
+                args->block_size = atoi(optarg);
+                if (args->block_size <= 0 || args->block_size >= MAX_BLOCK_SIZE) {
+                    fprintf(stderr, "Wrong block size, needs to be in [1, %u] but given %u\n", MAX_BLOCK_SIZE - 1, args->block_size);
+                    return -1;
+                }
+                break;
+            case 'w':
+                args->window_size = atoi(optarg);
+                if (args->window_size <= 0 || args->window_size >= MAX_RLC_WINDOW_SIZE) {
+                    fprintf(stderr, "Wrong block size, needs to be in [1, %u] but given %u\n", MAX_RLC_WINDOW_SIZE - 1, args->window_size);
+                    return -1;
+                }
+                break;
+            case 's':
+                args->window_slide = atoi(optarg);
+                if (args->window_slide <= 0 || args->window_slide >= MAX_RLC_WINDOW_SLIDE) {
+                    fprintf(stderr, "Wrong block size, needs to be in [1, %u] but given %u\n", MAX_RLC_WINDOW_SLIDE - 1, args->window_slide);
+                    return -1;
+                }
+                break;
+            case 'a':
+                args->attach = true;
+                break;
+            case 'i':
+                printf("ici");
+                if (args->attach) {
+                    interface_if_attach = true;
+                    strncpy(args->interface, optarg, 15);
+                }
+                break;
+            case '?':
+                usage(argv[0]);
+                return 1;
+            default:
+                usage(argv[0]);
+        }
+    }
+    if (args->attach && !interface_if_attach) {
+            fprintf(stderr, "You need to specify an interface to plug the program\n");
+            return -1;
+        }
+
+        return 0;
+}
+
+int main(int argc, char *argv[]) {
+    int err;
+    struct encoder_bpf *skel;
+
+    args_t plugin_arguments;
+    err = parse_args(&plugin_arguments, argc, argv);
+    if (err != 0) {
+        exit(EXIT_FAILURE);
     }
 
     /* IPv6 Source address */
     memset(&src, 0, sizeof(src));
     src.sin6_family = AF_INET6;
-    if (inet_pton(AF_INET6, argv[1], src.sin6_addr.s6_addr) != 1) {
+    if (inet_pton(AF_INET6, plugin_arguments.encoder_ip, src.sin6_addr.s6_addr) != 1) {
         perror("inet ntop src");
         return -1;
     }
@@ -134,7 +247,7 @@ int main(int argc, char *argv[]) {
     /* IPv6 Destination address */
     memset(&dst, 0, sizeof(dst));
 	dst.sin6_family = AF_INET6;
-	if (inet_pton(AF_INET6, argv[2], dst.sin6_addr.s6_addr) != 1) {
+	if (inet_pton(AF_INET6, plugin_arguments.decoder_ip, dst.sin6_addr.s6_addr) != 1) {
 		perror("inet_ntop dst");
 		return -1;
 	}
@@ -165,26 +278,30 @@ int main(int argc, char *argv[]) {
 
     bpf_object__pin(skel->obj, "/sys/fs/bpf/encoder");
 
-    char *cmd = "sudo ip -6 route add fc00::a encap seg6local action End.BPF endpoint fd /sys/fs/bpf/encoder/lwt_seg6local section notify_ok dev enp0s3";
-    printf("Command is %s\n", cmd);
-    //system(cmd);
+    if (plugin_arguments.attach) {
+        char attach_cmd[200];
+        memset(attach_cmd, 0, 200 * sizeof(char));
+        char *framework_str = plugin_arguments.framework == CONVO ? "convo" : "block";
+        sprintf(attach_cmd, "ip -6 route add %s encap seg6local action End.BPF endpoint fd /sys/fs/bpf/encoder/lwt_seg6local_%s section srv6_fec dev %s", 
+            plugin_arguments.encoder_ip, framework_str, plugin_arguments.interface);
+        fprintf(stderr, "Command used to attach: %s\n", attach_cmd);
+        system(attach_cmd);
+    }
 
     int k0 = 0;
-
-    // TODO: getopt for parameters !
 
     /* Get file descriptor of maps and init the value of the structures */
     struct bpf_map *map_fecBuffer = skel->maps.fecBuffer;
     int map_fd_fecBuffer = bpf_map__fd(map_fecBuffer);
     mapStruct_t block_init = {0};
-    block_init.currentBlockSize = 3; // TODO: here MIN(...)
+    block_init.currentBlockSize = plugin_arguments.block_size;
     bpf_map_update_elem(map_fd_fecBuffer, &k0, &block_init, BPF_ANY);
 
     struct bpf_map *map_fecConvolutionBuffer = skel->maps.fecConvolutionInfoMap;
     int map_fd_fecConvolutionBuffer = bpf_map__fd(map_fecConvolutionBuffer);
     fecConvolution_t convo_init = {0};
-    convo_init.currentWindowSize = 4; // TODO: here MIN(...)
-    convo_init.currentWindowSlide = 2;
+    convo_init.currentWindowSize = plugin_arguments.window_size;
+    convo_init.currentWindowSlide = plugin_arguments.window_slide;
     bpf_map_update_elem(map_fd_fecConvolutionBuffer, &k0, &convo_init, BPF_ANY);
 
     struct bpf_map *map_events = skel->maps.events;
@@ -205,7 +322,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* Enter perf event handling for packet recovering */
-    handle_events(map_fd_events);
+    handle_events(map_fd_events, plugin_arguments.framework);
 
     /* Close socket */
     if (close(sfd) == -1) {
@@ -224,5 +341,13 @@ cleanup:
     encoder_bpf__destroy(skel);
     /* Free memory of the RLC structure */
     free_rlc(rlc);
+
+    // Detach the program if we attached it
+    if (plugin_arguments.attach) {
+        char detach_cmd[200];
+        sprintf(detach_cmd, "ip -6 route del %s", plugin_arguments.encoder_ip);
+        fprintf(stderr, "Command used to detach: %s\n", detach_cmd);
+        system(detach_cmd);
+    }
     return 0;
 }

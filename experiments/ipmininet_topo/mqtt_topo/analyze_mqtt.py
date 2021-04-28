@@ -40,6 +40,7 @@ def read_mqtt_run_json(filename):
     clients_res = [i["msg_time_mean"] for i in data["runs"]]
 
     # Compute the median for all clients
+    # print(clients_res)
     return np.median(clients_res)
 
 
@@ -98,11 +99,31 @@ def exchanged_bytes():
             i += 1
         data_rlc_by_k.append(by_d)
     
-    for i in range(10):
-        plt.plot(data_without_by_k[i])
-        plt.plot(data_rlc_by_k[i])
-    #plt.plot(data_without)
-    #plt.plot(data_rlc)
+    without_normalized = [[j/1000 for j in i] for i in data_without_by_k]
+    rlc_normalized = [[j/1000 for j in i] for i in data_rlc_by_k]
+
+    fig, ax = plt.subplots()
+
+    to_plot = np.array([99, 95, 93, 90])
+    linestyles = ["-", "--", "-.", ":"]
+    colors_without = ["darkred", "firebrick", "red", "lightcoral"]
+    colors_rlc = ["darkblue", "royalblue", "darkcyan", "lightsteelblue"]
+    
+    for idx, i in enumerate(abs(to_plot - 99)):
+        ax.plot(without_normalized[i], color=colors_without[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
+    for idx, i in enumerate(abs(to_plot - 99)):
+        ax.plot(rlc_normalized[i], color=colors_rlc[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
+    
+    ax.set_xlabel("Value of the 'd' parameter of the Markov dropper model")
+    ax.set_ylabel("KB echanged during the test")
+    plt.legend(ncol=2,handleheight=2.4, labelspacing=0.05)
+
+    ax.grid(axis="y")
+    ax.set_axisbelow(True)
+
+    plt.ylim((150, 850))
+    plt.savefig("mqtt_bytes_exchanged.svg")
+    plt.savefig("mqtt_bytes_exchanged.png")
     plt.show()
 
 
@@ -149,11 +170,24 @@ def analyze_point_plot_idx():
             idx += 1
         res_by_k_rlc.append(res_by_d)
     
-    for i, elem in enumerate(res_by_k):
-        plt.plot(elem, label=i, color="blue")
-    for i, elem in enumerate(res_by_k_rlc):
-        plt.plot(elem, color="orange")
-    plt.legend()
+    to_plot = np.array([99, 95, 93, 90])
+    linestyles = ["-", "--", "-.", ":"]
+    colors_without = ["darkred", "firebrick", "red", "lightcoral"]
+    colors_rlc = ["darkblue", "royalblue", "darkcyan", "lightsteelblue"]
+
+    fig, ax = plt.subplots()
+    ax.grid(axis="y")
+    ax.set_axisbelow(True)
+
+    for idx, i in enumerate(abs(to_plot - 99)):
+        ax.plot(res_by_k[i], color=colors_without[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
+    for idx, i in enumerate(abs(to_plot - 99)):
+        ax.plot(res_by_k_rlc[i], color=colors_rlc[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
+    
+    ax.set_xlabel("Value of the 'd' parameter of the Markov dropper model")
+    ax.set_ylabel("Mean latency to send a MQTT message to the broker")
+    plt.legend(ncol=2,handleheight=2.4, labelspacing=0.05)
+
     plt.ylim((20, 60))
     plt.show()
 
