@@ -213,7 +213,6 @@ int parse_args(args_t *args, int argc, char *argv[]) {
                 args->attach = true;
                 break;
             case 'i':
-                printf("ici");
                 if (args->attach) {
                     interface_if_attach = true;
                     strncpy(args->interface, optarg, 15);

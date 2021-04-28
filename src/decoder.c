@@ -7,6 +7,7 @@
 #include <strings.h>
 #include <sys/resource.h>
 #include <errno.h>
+#include <getopt.h>
 #include <bpf/libbpf.h>
 #include "decoder.skel.h"
 #include <bpf/bpf.h>
@@ -20,6 +21,18 @@
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 #include <linux/seg6.h>
+
+enum fec_framework {
+    CONVO = 0,
+    BLOCK = 1,
+};
+
+typedef struct {
+    char decoder_ip[48];
+    enum fec_framework framework;
+    bool attach;
+    char interface[15];
+} args_t;
 
 /* Used to detect the end of the program */
 static volatile int exiting = 0;
@@ -64,11 +77,11 @@ static void send_recovered_symbol_XOR(void *ctx, int cpu, void *data, __u32 data
     send_raw_socket(sfd, repairSymbol, local_addr);
 }
 
-static void debug_print(fecConvolution_t *fecConvolution) {
+/*static void debug_print(fecConvolution_t *fecConvolution) {
     for (int i = 0; i < RLC_RECEIVER_BUFFER_SIZE; ++i) {
         printf("Valeur du source symbol is: %d\n", ((struct tlvSource__convo_t *)(&fecConvolution->sourceRingBuffer[i].tlv))->encodingSymbolID);
     }
-}
+}*/
 
 int globalCount = 0;
 
@@ -89,12 +102,14 @@ static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
     }
 }
 
-static void handle_events(int map_fd_events) {
+static void handle_events(int map_fd_events, enum fec_framework framework) {
     /* Define structure for the perf event */
-    struct perf_buffer_opts pb_opts = {
-        .sample_cb = fecScheme,
-        //.sample_cb = send_recovered_symbol_XOR,
-    };
+    struct perf_buffer_opts pb_opts = {0};
+    if (framework == BLOCK) {
+        pb_opts.sample_cb = send_recovered_symbol_XOR;
+    } else {
+        pb_opts.sample_cb = fecScheme;
+    }
     struct perf_buffer *pb = NULL;
     int err;
 
@@ -123,21 +138,85 @@ cleanup:
     perf_buffer__free(pb);
 }
 
+void usage(char *prog_name) {
+    fprintf(stderr, "USAGE:\n");
+    fprintf(stderr, "    %s [-f framework] [-d decoder ipv6]\n", prog_name);
+    fprintf(stderr, "    -f framework (default: convo): FEC Framework to use [convo, block]\n");
+    fprintf(stderr, "    -d decoder_ip (default: fc00::9): IPv6 of the decoder router\n");
+    fprintf(stderr, "    -a attach: if set, attempts to attach the program to *encoder_ip*\n");
+    fprintf(stderr, "    -i interface: the interface to which attach the program (if *attach* is set)\n");
+}
+
+int parse_args(args_t *args, int argc, char *argv[]) {
+    memset(args, 0, sizeof(args_t));
+    // Default values
+    strcpy(args->decoder_ip, "fc00::9");
+    args->framework = CONVO;
+    args->attach = false;
+
+    bool interface_if_attach = false;
+
+    int opt;
+    while ((opt = getopt(argc, argv, "f:d:ai:")) != -1) {
+        switch (opt) {
+            case 'f':
+                if (strncmp(optarg, "block", 6) == 0) {
+                    args->framework = BLOCK;
+                } else if (strncmp(optarg, "convo", 6) == 0) {
+                    args->framework = CONVO;
+                } else {
+                    fprintf(stderr, "Wrong FEC Framework: %s\n", optarg);
+                    return -1;
+                }
+                break;
+            case 'd':
+                if (strlen(optarg) > 48) {
+                    fprintf(stderr, "Wrong decoder IPv6 address: %s\n", optarg);
+                    return -1;
+                }
+                strncpy(args->decoder_ip, optarg, 48);
+                break;
+            case 'a':
+                args->attach = true;
+                break;
+            case 'i':
+                if (args->attach) {
+                    interface_if_attach = true;
+                    strncpy(args->interface, optarg, 15);
+                }
+                break;
+            case '?':
+                usage(argv[0]);
+                return 1;
+            default:
+                usage(argv[0]);
+                return 1;
+        }
+    }
+    if (args->attach && !interface_if_attach) {
+            fprintf(stderr, "You need to specify an interface to plug the program\n");
+            return -1;
+        }
+
+        return 0;
+}
+
 int main(int argc, char **argv)
 {
     struct decoder_bpf *skel;
     int err;
 
-    if (argc != 2) {
-        fprintf(stderr, "Usage: ./decoder <decoder_addr>");
-        return -1;
+    args_t plugin_arguments;
+    err = parse_args(&plugin_arguments, argc, argv);
+    if (err != 0) {
+        exit(EXIT_FAILURE);
     }
 
     /* Init the address structure for current node */
     memset(&local_addr, 0, sizeof(local_addr));
     local_addr.sin6_family = AF_INET6;
     // TODO: now it is hardcoded
-    if (inet_pton(AF_INET6, argv[1], local_addr.sin6_addr.s6_addr) != 1) {
+    if (inet_pton(AF_INET6, plugin_arguments.decoder_ip, local_addr.sin6_addr.s6_addr) != 1) {
         perror("inet ntop src");
         return -1;
     }
@@ -169,8 +248,15 @@ int main(int argc, char **argv)
     /* Pin program object to attach it with iproute2 */
     bpf_object__pin(skel->obj, "/sys/fs/bpf/decoder");
 
-    char *cmd = "sudo ip -6 route add fc00::9 encap seg6local action End.BPF endpoint fd /sys/fs/bpf/decoder/lwt_seg6local section decode dev enp0s3";
-    printf("Command is %s\n", cmd);
+    if (plugin_arguments.attach) {
+        char attach_cmd[200];
+        memset(attach_cmd, 0, 200 * sizeof(char));
+        char *framework_str = plugin_arguments.framework == CONVO ? "convo" : "block";
+        sprintf(attach_cmd, "ip -6 route add %s encap seg6local action End.BPF endpoint fd /sys/fs/bpf/decoder/lwt_seg6local_%s section srv6_fec dev %s", 
+            plugin_arguments.decoder_ip, framework_str, plugin_arguments.interface);
+        fprintf(stderr, "Command used to attach: %s\n", attach_cmd);
+        system(attach_cmd);
+    }
 
     /* Get file descriptor of maps and init the value of the structures */
     struct bpf_map *map_xorBuffer = skel->maps.xorBuffer;
@@ -204,9 +290,7 @@ int main(int argc, char **argv)
     }
 
     /* Enter perf event handling for packet recovering */
-    handle_events(map_fd_events);
-
-    printf("Arrive ici\n");
+    handle_events(map_fd_events, plugin_arguments.framework);
 
     /* Close socket */
     if (close(sfd) == -1) {
@@ -227,5 +311,13 @@ cleanup:
     decoder_bpf__destroy(skel);
     /* Free memory of the RLC structure */
     free_rlc_decode(rlc);
+
+    // Detach the program if we attached it
+    if (plugin_arguments.attach) {
+        char detach_cmd[200];
+        sprintf(detach_cmd, "ip -6 route del %s", plugin_arguments.decoder_ip);
+        fprintf(stderr, "Command used to detach: %s\n", detach_cmd);
+        system(detach_cmd);
+    }
     return 0;
 }
