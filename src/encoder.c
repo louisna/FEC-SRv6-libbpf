@@ -137,7 +137,15 @@ cleanup:
 
 void usage(char *prog_name) {
     fprintf(stderr, "USAGE:\n");
-    fprintf(stderr, "   %s", prog_name);
+    fprintf(stderr, "    %s [-f framework] [-e encoder ipv6] [-d decoder ipv6]\n", prog_name);
+    fprintf(stderr, "    -f framework (default: convo): FEC Framework to use [convo, block]\n");
+    fprintf(stderr, "    -e encoder_ip (default: fc00::a): IPv6 of the encoder router\n");
+    fprintf(stderr, "    -d decoder_ip (default: fc00::9): IPv6 of the decoder router\n");
+    fprintf(stderr, "    -b block_size (default: 3): size of a FEC Block (used if framework is block)\n");
+    fprintf(stderr, "    -w window_size (default: 4): size of the FEC Window (used if framework is convo)\n");
+    fprintf(stderr, "    -s window_slide (default: 2) slide of the window after each repair symbol (used if framework is convo)\n");
+    fprintf(stderr, "    -a attach: if set, attempts to attach the program to *encoder_ip*\n");
+    fprintf(stderr, "    -i interface: the interface to which attach the program (if *attach* is set)\n");
 }
 
 int parse_args(args_t *args, int argc, char *argv[]) {
@@ -216,6 +224,7 @@ int parse_args(args_t *args, int argc, char *argv[]) {
                 return 1;
             default:
                 usage(argv[0]);
+                return 1;
         }
     }
     if (args->attach && !interface_if_attach) {
