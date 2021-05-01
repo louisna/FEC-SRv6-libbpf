@@ -23,7 +23,6 @@ struct {
 SEC("lwt_seg6local_convo")
 int srv6_fec_encode_convo(struct __sk_buff *skb)
 {
-    bpf_printk("Entering convo\n");
     if (DEBUG) bpf_printk("BPF triggered from packet with SRv6 !\n");
 
     int err;
@@ -58,7 +57,6 @@ SEC("lwt_seg6local_block")
 int srv6_fec_encode_block(struct __sk_buff *skb)
 {
     if (DEBUG) bpf_printk("BPF triggered from packet with SRv6 !\n");
-    bpf_printk("Entering block\n");
 
     int err;
     int k = 0;  // Key for hashmap

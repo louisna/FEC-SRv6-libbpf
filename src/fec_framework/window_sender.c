@@ -43,7 +43,7 @@ static __always_inline int fecFramework__convolution(struct __sk_buff *skb, void
     /* Update encodingSymbolID: wraps to zero after 2^32 - 1 */
     bpf_spin_lock(&fecConvolution->lock);
     __u32 encodingSymbolID = fecConvolution->encodingSymbolID;
-    __u8 repairKey = fecConvolution->repairKey;
+    __u16 repairKey = fecConvolution->repairKey;
     __u8 ringBuffSize = fecConvolution->ringBuffSize;
     __u8 windowSize = fecConvolution->currentWindowSize;
     fecConvolution->encodingSymbolID = encodingSymbolID + 1;

@@ -13,7 +13,7 @@
 
 static __always_inline int fecScheme__convoRLC(struct __sk_buff *skb, fecConvolution_t *fecConvolution, __u8 newRingBuffSize, __u32 encodingSymbolID) {
     int err;
-    __u8 repairKey = fecConvolution->repairKey;
+    __u16 repairKey = fecConvolution->repairKey;
     __u8 windowSize = fecConvolution->currentWindowSize;
     __u8 windowSlide = fecConvolution->currentWindowSlide;
 
@@ -28,7 +28,7 @@ static __always_inline int fecScheme__convoRLC(struct __sk_buff *skb, fecConvolu
             repairTlv->len = sizeof(struct tlvRepair__convo_t) - 2;
             repairTlv->unused = 0;
             repairTlv->encodingSymbolID = encodingSymbolID; // Set to the value of the last source symbol of the window
-            repairTlv->repairFecInfo = (windowSlide << 8) + repairKey;
+            repairTlv->repairFecInfo = (windowSlide << 16) + repairKey;
             repairTlv->nss = windowSize;
             repairTlv->nrs = RLC_RS_NUMBER;
         }

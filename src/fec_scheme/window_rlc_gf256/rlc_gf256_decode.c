@@ -184,7 +184,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
         struct tlvRepair__convo_t *repairTLV = (struct tlvRepair__convo_t *)&window_info->repairSymbol.tlv;
         if (current_encodingSymbolID == repairTLV->encodingSymbolID) {
             rlc_window_size = repairTLV->nss; // Assumes that these two values will always be the same
-            rlc_window_slide = repairTLV->repairFecInfo >> 8;
+            rlc_window_slide = repairTLV->repairFecInfo >> 16;
             ++effective_window_check;
             current_encodingSymbolID -= rlc_window_slide;
         } else {
@@ -337,7 +337,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
             memcpy(constant_terms[i], repairSymbol->packet, MAX_PACKET_SIZE);
             memcpy(constant_terms[i] + MAX_PACKET_SIZE, &repair_tlv->coded_payload_len, sizeof(uint16_t));
             memset(system_coefs[i], 0, nb_unknowns);
-            uint16_t repairKey = ((struct tlvRepair__convo_t *)&repairSymbol->tlv)->repairFecInfo & 0xff;
+            uint16_t repairKey = ((struct tlvRepair__convo_t *)&repairSymbol->tlv)->repairFecInfo & 0xffff;
             rlc__get_coefs(&prng, repairKey, rlc_window_size, coefs); // TODO: coefs specific ? line 454
             //printf("repairKey is %d venant de %x\n", repairKey, ((struct tlvRepair__convo_t *)&repairSymbol->tlv)->repairFecInfo);
             //struct tlvRepair__convo_t *tlv = ((struct tlvRepair__convo_t *)&repairSymbol->tlv);

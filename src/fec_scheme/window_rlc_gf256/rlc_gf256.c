@@ -22,7 +22,7 @@ static int rlc__generate_a_repair_symbol(fecConvolution_t *fecConvolution, encod
     uint8_t windowSize = fecConvolution->currentWindowSize;
     //printf("Passage 1\n");
     struct tlvRepair__convo_t *tlv = (struct tlvRepair__convo_t *)&fecConvolution->repairTlv[idx];
-    uint16_t repairKey = tlv->repairFecInfo & 0xff;
+    uint16_t repairKey = tlv->repairFecInfo & 0xffff;
     //uint8_t windowSlide = fecConvolution->currentWindowSlide;
     //printf("size=%d, slide=%d\n", windowSize, windowSlide);
 
