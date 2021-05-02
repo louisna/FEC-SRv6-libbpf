@@ -51,5 +51,12 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
-# Visual Studio Code
-.DS_STORE 
+# MAC OS
+.DS_STORE
+
+# Results
+*.svg
+*.png
+src/.output/
+src/decoder
+src/encoder 
