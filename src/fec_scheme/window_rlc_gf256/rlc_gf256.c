@@ -60,7 +60,7 @@ static int rlc__generate_a_repair_symbol(fecConvolution_t *fecConvolution, encod
 
         /* Encode the source symbol in the packet */
         //printf("Source symbol packet length: %u\n", sourceSymbol->packet_length);
-        symbol_add_scaled(repairSymbol->packet, coefs[i], sourceSymbol->packet, MAX_PACKET_SIZE, rlc->muls);
+        symbol_add_scaled(repairSymbol->packet, coefs[i], sourceSymbol->packet, sourceSymbol->packet_length, rlc->muls);
         symbol_add_scaled(&coded_length, coefs[i], &sourceSymbol->packet_length, sizeof(uint16_t), rlc->muls);
     }
     //printf("Passage 1\n");

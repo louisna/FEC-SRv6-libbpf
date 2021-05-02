@@ -103,7 +103,7 @@ static __always_inline int storeRepairSymbol(struct __sk_buff *skb, struct repai
     __u32 payload_offset = (long)payload_pointer - (long)data;
     const __u16 size = payload_len - 1;
 
-    err = bpf_skb_load_bytes(skb, payload_offset, (void *)repairSymbol->packet, ((skb->len - payload_offset - 1) & 0x1ff) + 1);
+    err = bpf_skb_load_bytes(skb, payload_offset, (void *)repairSymbol->packet, ((skb->len - payload_offset - 1) & (MAX_PACKET_SIZE - 1)) + 1);
     if (err < 0) {
         if (DEBUG) bpf_printk("Receiver: impossible to load bytes\n");
         return -1;

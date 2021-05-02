@@ -188,10 +188,12 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
             ++effective_window_check;
             current_encodingSymbolID -= rlc_window_slide;
         } else {
+            //printf("WWhy %u? %u %u\n", i, current_encodingSymbolID, repairTLV->encodingSymbolID);
             break; // Gap in the repair symbols, we stop
         }
     }
     if (effective_window_check == 0) {
+        //printf("Snif\n");
         return -1;
     }
     //printf("Current encodingSymbolID is: %d\n", encodingSymbolID);
@@ -239,13 +241,13 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
         if (id_from_buffer == theoric_id && tlv->tlv_type != 0) {
             source_symbols_array[i] = malloc(decoding_size);
             memset(source_symbols_array[i], 0, decoding_size);
-            memcpy(source_symbols_array[i], fecConvolution->sourceRingBuffer[idx].packet, MAX_PACKET_SIZE);
+            memcpy(source_symbols_array[i], fecConvolution->sourceRingBuffer[idx].packet, fecConvolution->sourceRingBuffer[idx].packet_length);
             memcpy(source_symbols_array[i] + MAX_PACKET_SIZE, &fecConvolution->sourceRingBuffer[idx].packet_length, sizeof(uint16_t));
             //printf("Source symbol #%d at index %d=%x\n", i, 137, source_symbols_array[i][137]);
         } else if (rlc->recoveredSources[idx] && rlc->recoveredSources[idx]->encodingSymbolID == theoric_id) {
             source_symbols_array[i] = malloc(decoding_size);
             memset(source_symbols_array[i], 0, decoding_size);
-            memcpy(source_symbols_array[i], rlc->recoveredSources[idx]->packet, MAX_PACKET_SIZE);
+            memcpy(source_symbols_array[i], rlc->recoveredSources[idx]->packet, rlc->recoveredSources[idx]->packet_length);
             memcpy(source_symbols_array[i] + MAX_PACKET_SIZE, &rlc->recoveredSources[idx]->packet_length, sizeof(uint16_t));
         } else {
             //printf("Symbol with id=%d is unknown apparently\n", id_first_ss_first_window + i);
@@ -334,7 +336,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
             struct tlvRepair__convo_t *repair_tlv = (struct tlvRepair__convo_t *)&repairSymbol->tlv;
         
             memset(constant_terms[i], 0, decoding_size);
-            memcpy(constant_terms[i], repairSymbol->packet, MAX_PACKET_SIZE);
+            memcpy(constant_terms[i], repairSymbol->packet, repairSymbol->packet_length);
             memcpy(constant_terms[i] + MAX_PACKET_SIZE, &repair_tlv->coded_payload_len, sizeof(uint16_t));
             memset(system_coefs[i], 0, nb_unknowns);
             uint16_t repairKey = ((struct tlvRepair__convo_t *)&repairSymbol->tlv)->repairFecInfo & 0xffff;

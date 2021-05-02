@@ -5,6 +5,21 @@
 #define TLV_CODING_REPAIR 157
 #define MAX_PACKET_SIZE 512
 
+#define my_memset(ptr, size) ({\
+    __u64 *____ptr_64 = (__u64 *)ptr;\
+    for (__u16 ____i = 0; ____i < size / 8; ++____i) {\
+        ____ptr_64[____i] = 0;\
+    }\
+})
+
+#define my_memcpy(ptr1, ptr2, size) ({\
+    __u64 *____ptr1_64 = (__u64 *)ptr1;\
+    __u64 *____ptr2_64 = (__u64 *)ptr2;\
+    for (__u16 ____i = 0; ____i < size / 8; ++____i) {\
+        ____ptr1_64[____i] = ____ptr2_64[____i];\
+    }\
+})
+
 #define BPF_PACKET_HEADER __attribute__((packed))
 
 /* Block FEC Framework */
@@ -30,7 +45,7 @@ struct tlvRepair__block_t {
 } BPF_PACKET_HEADER;
 
 /* Convolutional FEC FRamework */
-#define MAX_RLC_WINDOW_SIZE 8
+#define MAX_RLC_WINDOW_SIZE 16
 #define MAX_RLC_WINDOW_SLIDE 4
 #define MAX_RLC_REPAIR_GEN 8
 

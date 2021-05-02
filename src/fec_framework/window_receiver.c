@@ -69,11 +69,6 @@ static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *sk
          bpf_printk("Receiver: source symbol already in the buffer: %d %d\n", tlv_ss->encodingSymbolID, encodingSymbolID);
         return -1;
     }
-    // Otherwise we just reset the location
-    __u64 *ss64 = (__u64 *)sourceSymbol->packet;
-    for (int i = 0; i < MAX_PACKET_SIZE / 8; ++i) {
-        ss64[i] = 0;
-    }
 
     /* Store source symbol */
     err = storePacket_decode(skb, sourceSymbol);
@@ -143,8 +138,8 @@ static __always_inline int receiveRepairSymbol__convolution(struct __sk_buff *sk
     /* Get pointer to information of the window */
     window_info_t *window_info = &fecConvolution->windowInfoBuffer[windowRingBufferIndex & (RLC_RECEIVER_BUFFER_SIZE - 1)];
     // TODO: check if already received repair symbol ?
+    bpf_printk("Will store a repair symbol with encodingSymbolID=%u at index %u\n", encodingSymbolID, windowRingBufferIndex & (RLC_RECEIVER_BUFFER_SIZE - 1));
     struct repairSymbol_t *repairSymbol = &window_info->repairSymbol;
-    memset(repairSymbol, 0, sizeof(struct repairSymbol_t)); // Optimization ?
 
     /* Store repair symbol */
     err = storeRepairSymbol(skb, repairSymbol, srh);

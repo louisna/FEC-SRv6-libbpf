@@ -36,7 +36,7 @@ static __always_inline int storePacket(struct __sk_buff *skb, struct sourceSymbo
     if (ipv6_offset < 0 || ipv6_offset > MAX_PACKET_SIZE) return -1;
 
     // TODO: 0xffff should be set as global => ensures that the size is the max classic size of IPv6 packt
-    err = bpf_skb_load_bytes(skb, ipv6_offset, sourceSymbol->packet, ((skb->len - ipv6_offset - 1) & 0x1ff) + 1);
+    err = bpf_skb_load_bytes(skb, ipv6_offset, sourceSymbol->packet, ((skb->len - ipv6_offset - 1) & (MAX_PACKET_SIZE - 1)) + 1);
     if (err < 0) {
         bpf_printk("Sender: impossible to load bytes from packet\n");
         return -1;

@@ -82,7 +82,7 @@ static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz)
 static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
     fecConvolution_t *fecConvolution = (fecConvolution_t *)data;
     //printf("Call triggered: %d\n", fecConvolution->encodingSymbolID);
-    //printf("And the TLV value is: %u\n", fecConvolution->repairTlv.encodingSymbolID);
+    //printf("And the TLV value is: %u type=%u\n", fecConvolution->repairTlv[0].encodingSymbolID, fecConvolution->repairTlv[0].tlv_type);
 
     /* Generate the repair symbol */
     int err = rlc__generate_repair_symbols(fecConvolution, rlc, sfd, &src, &dst);
