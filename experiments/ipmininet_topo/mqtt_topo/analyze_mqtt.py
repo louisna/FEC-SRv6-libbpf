@@ -1,8 +1,10 @@
 import matplotlib.pyplot as plt
+from matplotlib.ticker import PercentFormatter
 import json
 import os
 import numpy as np
 from tqdm import tqdm
+
 
 
 # https://stackabuse.com/reading-and-writing-json-to-a-file-in-python/
@@ -37,6 +39,8 @@ def read_mqtt_run_json(filename):
     with open(filename, "r") as fd:
         data = json.load(fd)
     
+    return data["totals"]["msg_time_mean_avg"]
+    
     clients_res = [i["msg_time_mean"] for i in data["runs"]]
 
     # Compute the median for all clients
@@ -51,20 +55,98 @@ def read_mqtt_run_json_all(filename):
     return [i["msg_time_mean"] for i in data["runs"]]
 
 
-def sort_list(filename):
+def sort_list_by_idx(filename):
     nb = filename.split("_")[-1].split(".")[0]
     return int(nb)
 
 
-def analyze_point_plot_same_K(K=95):
-    analyze_point_plot_idx(range((99 - K) * 49, (99 - K + 1) * 49))
+def sort_list_by_double_idx(filename):
+    delay = filename.split("_")[-2]
+    idx = filename.split("_")[-1].split(".")[0]
+    return int(delay) * 100 + int(idx)
+
+def loss_varying_delay(MARKOV=True):
+    if MARKOV:
+        _, _, filenames_without = next(os.walk("results_without_delay/"))
+        _, _, filenames_with = next(os.walk("results_rlc_delay/"))
+        nb_exp = 19
+        idxs_to_plot = np.arange(99, 89.5, -0.5)
+    else:
+        _, _, filenames_without = next(os.walk("results_without_uniform/"))
+        _, _, filenames_with = next(os.walk("results_rlc_uniform/"))
+        nb_exp = 31
+        idxs_to_plot = np.arange(0, 15.1, 0.5)
+
+    sorted_filenames_without = sorted(filenames_without, key=sort_list_by_double_idx)
+    sorted_filenames_rlc = sorted(filenames_with, key=sort_list_by_double_idx)
+    res_by_delay_without = []
+    res_by_delay_rlc = []
+    idx = 0
+    for delay in [5, 10, 15]:
+        res_by_u_without = []
+        res_by_u_rlc = []
+        for u in range(nb_exp):
+            filename = sorted_filenames_without[idx]
+            if MARKOV:
+                path = os.path.join("results_without_delay", filename)
+            else:
+                path = os.path.join("results_without_uniform", filename)
+            res_by_u_without.append(read_mqtt_run_json(path))
+            
+            filename = sorted_filenames_rlc[idx]
+            if MARKOV:
+                path = os.path.join("results_rlc_delay", filename)
+            else:
+                path = os.path.join("results_rlc_uniform", filename)
+            res_by_u_rlc.append(read_mqtt_run_json(path))
+
+            idx += 1
+        res_by_delay_without.append(res_by_u_without)
+        res_by_delay_rlc.append(res_by_u_rlc)
+    
+    fig, ax = plt.subplots()
+    ax.grid()
+    ax.set_axisbelow(True)
+    linestyles = ["-", "--", ":"]
+    colors_without = ["lightcoral", "red", "firebrick", "darkred"]
+    colors_rlc = ["slategrey", "darkcyan", "royalblue", "darkblue"]
+
+    p_without = []
+    p_rlc = []
+    
+    for idx, res_delay in enumerate(res_by_delay_without):
+        p, = ax.plot(idxs_to_plot, res_delay, marker=".", linestyle=linestyles[idx], color=colors_without[idx+1])
+        p_without.append(p)
+    
+    for idx, res_delay in enumerate(res_by_delay_rlc):
+        p, = ax.plot(idxs_to_plot, res_delay, marker=".", linestyle=linestyles[idx], color=colors_rlc[idx+1])
+        p_rlc.append(p)
+    
+    # Dummy plot
+    p5, = plt.plot([0], marker='None',
+           linestyle='None', label='dummy-tophead')
+
+    if MARKOV:
+        ax.set_xlabel("Value of the 'k' parameter of the Uniform loss model")
+    else:
+        ax.set_xlabel("Value of the 'u' parameter of the Uniform loss model")
+    ax.set_ylabel("Mean latency [ms]")
+    lat_str = [str(i) + "ms" for i in [5, 10, 15]]
+    leg3 = plt.legend([p5] + p_without + [p5] + p_rlc,
+              ["TCP"] + lat_str + ["RLC"] + lat_str,
+              loc=2, ncol=2) # Two columns, vertical group labels
+    if MARKOV:
+        plt.xlim((99.5, 89.5))
+        plt.ylim((10, 60))
+        plt.xticks(np.arange(90, 100, 1))
+        plt.savefig("exp_mqtt_varying_delay_markov.svg")
+    else:
+        plt.ylim((10, 85))
+        plt.savefig("exp_mqtt_varying_delay_uniform.svg")
+    plt.show()
 
 
-def analyze_point_plot_same_D(D=30):
-    analyze_point_plot_idx(range(D - 2, (D - 2) + 10 * 49, 49))
-
-
-def exchanged_bytes():
+def exchanged_bytes(cdf=False):
     data_without = []
     data_rlc = []
     with open("trace_pipe_without.txt", "r") as fd:
@@ -104,35 +186,109 @@ def exchanged_bytes():
 
     fig, ax = plt.subplots()
 
-    to_plot = np.array([99, 95, 93, 90])
-    linestyles = ["-", "--", "-.", ":"]
-    colors_without = ["darkred", "firebrick", "red", "lightcoral"]
-    colors_rlc = ["darkblue", "royalblue", "darkcyan", "lightsteelblue"]
-    
-    for idx, i in enumerate(abs(to_plot - 99)):
-        ax.plot(without_normalized[i], color=colors_without[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
-    for idx, i in enumerate(abs(to_plot - 99)):
-        ax.plot(rlc_normalized[i], color=colors_rlc[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
-    
-    ax.set_xlabel("Value of the 'd' parameter of the Markov dropper model")
-    ax.set_ylabel("KB echanged during the test")
-    plt.legend(ncol=2,handleheight=2.4, labelspacing=0.05)
+    if not cdf:
+        to_plot = np.array([99, 95, 93, 90])
+        tp = [99, 95, 93, 90]
+        tp_str = ["k=" + str(i) for i in tp]
+        linestyles = ["-", "--", "-.", ":"]
+        # Exists also: linestyle=(0, (5, 2, 1, 2))
+        colors_without = ["lightcoral", "red", "firebrick", "darkred"]
+        colors_rlc = ["slategrey", "darkcyan", "royalblue", "darkblue"]
 
-    ax.grid(axis="y")
-    ax.set_axisbelow(True)
+        p_without = []
+        p_rlc = []
+        
+        for idx, i in enumerate(abs(to_plot - 99)):
+            p, = ax.plot(without_normalized[i], color=colors_without[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
+            p_without.append(p)
+        for idx, i in enumerate(abs(to_plot - 99)):
+            p, = ax.plot(rlc_normalized[i], color=colors_rlc[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
+            p_rlc.append(p)
+        
+        # Dummy plots
+            p5, = plt.plot([0], marker='None',
+            linestyle='None', label='dummy-tophead')
 
-    plt.ylim((150, 850))
-    plt.savefig("mqtt_bytes_exchanged.svg")
-    plt.savefig("mqtt_bytes_exchanged.png")
-    plt.show()
+        ax.set_xlabel("Value of the 'd' parameter of the Markov dropper model")
+        ax.set_ylabel("Data sent [kB]")
+        leg3 = plt.legend([p5] + p_without + [p5] + p_rlc,
+                ["TCP"] + tp_str + ["RLC"] + tp_str,
+                loc=2, ncol=2) # Two columns, vertical group labels
+
+        ax.grid()
+        ax.set_axisbelow(True)
+
+        # plt.title("Data sent by the MQTT clients (+ the UDP traffic)\nDepending on k and d from the Markov loss model")
+        plt.ylim((150, 750))
+        plt.savefig("figures/mqtt_bytes_exchanged.svg")
+        plt.savefig("figures/mqtt_bytes_exchanged.png")
+        plt.show()
+    
+    else:
+
+        # Flatten lists
+        without_normalized = [j for i in without_normalized for j in i]
+        rlc_normalized = [j for i in rlc_normalized for j in i]
+
+        # TCP without plugin without loss
+        baseline = without_normalized[0]
+        without_baseline = [(i / baseline) * 100 for i in without_normalized[1:]]
+        rlc_baseline = [(i / baseline) * 100 for i in rlc_normalized]
+
+        min_r = min(min(without_normalized), min(rlc_normalized)) - 1
+        max_r = max(max(without_normalized), max(rlc_normalized)) + 1
+
+        hist_without, bin_edges_without = np.histogram(without_baseline, bins=60, range=(0, 400), density=True)
+        hist_with, bin_edges_with = np.histogram(rlc_baseline, bins=60, range=(0, 400), density=True)
+        dx = bin_edges_without[1] - bin_edges_without[0]
+        cdf_without = np.cumsum(hist_without) * dx
+        cdf_with = np.cumsum(hist_with) * dx
+
+        cdf_without_filtered = []
+        cdf_rfc_filtered = []
+        for i in cdf_without:
+            if i < 0.0001:
+                cdf_without_filtered.append(-10)
+            elif i > 99.999:
+                cdf_without_filtered.append(10)
+            else:
+                cdf_without_filtered.append(i)
+        for i in cdf_with:
+            if i < 0.0001:
+                cdf_rfc_filtered.append(-10)
+            elif i > 99.999:
+                cdf_rfc_filtered.append(10)
+            else:
+                cdf_rfc_filtered.append(i)
+        
+        # Plot the baseline
+        ax.plot([100, 100], [0, 1], color="black", linestyle=":", label="Baseline TCP", linewidth=3)
+
+        ax.plot(bin_edges_without[1:], cdf_without_filtered, label="TCP", color="red", linestyle="-")
+        ax.plot(bin_edges_with[1:], cdf_rfc_filtered, label="RLC", color="darkblue", linestyle="-.")
+
+        ax.set_xlabel("Data sent compared to the TCP baseline (i.e. without loss) [%]")
+        ax.set_ylabel("CDF")
+        plt.legend()
+        plt.ylim((0, 1))
+        # plt.gca().xaxis.set_major_formatter(PercentFormatter(1))
+
+        ax.grid()
+        ax.set_axisbelow(True)
+
+        # plt.title("Data sent by the MQTT clients (+ the UDP traffic)\nDepending on k and d from the Markov loss model")
+        # plt.ylim((min_r, max_r))
+        plt.savefig("figures/mqtt_bytes_exchanged_cdf.svg")
+        plt.savefig("figures/mqtt_bytes_exchanged_cdf.png")
+        plt.show()
 
 
 def analyze_point_plot_idx():
     _, _, filenames_without = next(os.walk("results_without_10/"))
     _, _, filenames_with = next(os.walk("results_rlc_3/"))
 
-    sorted_filenames_without = sorted(filenames_without, key=sort_list)
-    sorted_filenames_with = sorted(filenames_with, key=sort_list)
+    sorted_filenames_without = sorted(filenames_without, key=sort_list_by_idx)
+    sorted_filenames_with = sorted(filenames_with, key=sort_list_by_idx)
 
     res_without = list()
     res_rlc = list()
@@ -171,31 +327,48 @@ def analyze_point_plot_idx():
         res_by_k_rlc.append(res_by_d)
     
     to_plot = np.array([99, 95, 93, 90])
+    tp = [99, 95, 93, 90]
+    tp_str = ["k=" + str(i) for i in tp]
     linestyles = ["-", "--", "-.", ":"]
-    colors_without = ["darkred", "firebrick", "red", "lightcoral"]
-    colors_rlc = ["darkblue", "royalblue", "darkcyan", "lightsteelblue"]
+    colors_without = ["lightcoral", "red", "firebrick", "darkred"]
+    colors_rlc = ["slategrey", "darkcyan", "royalblue", "darkblue"]
 
     fig, ax = plt.subplots()
-    ax.grid(axis="y")
+    ax.grid()
     ax.set_axisbelow(True)
 
+    p_without = []
+    p_rlc = []
+
     for idx, i in enumerate(abs(to_plot - 99)):
-        ax.plot(res_by_k[i], color=colors_without[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
+        p, = ax.plot(res_by_k[i], color=colors_without[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
+        p_without.append(p)
     for idx, i in enumerate(abs(to_plot - 99)):
-        ax.plot(res_by_k_rlc[i], color=colors_rlc[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
+        p, = ax.plot(res_by_k_rlc[i], color=colors_rlc[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
+        p_rlc.append(p)
     
+    # Dummy plot
+    p5, = plt.plot([0], marker='None',
+           linestyle='None', label='dummy-tophead')
+
     ax.set_xlabel("Value of the 'd' parameter of the Markov dropper model")
-    ax.set_ylabel("Mean latency to send a MQTT message to the broker")
-    plt.legend(ncol=2,handleheight=2.4, labelspacing=0.05)
+    ax.set_ylabel("Mean latency [ms]")
+    # plt.legend(ncol=2,handleheight=2.4, labelspacing=0.05)
+    leg3 = plt.legend([p5] + p_without + [p5] + p_rlc,
+              ["TCP"] + tp_str + ["RLC"] + tp_str,
+              loc=2, ncol=2) # Two columns, vertical group labels
 
     plt.ylim((20, 60))
+    # plt.title("Mean latency to send a MQTT message to the broker\nDepending on k and d from the Markov loss model")
+    plt.savefig("figures/exp_mqtt_latency_99_95_93_90.svg")
+    # plt.savefig("figures/mqtt_latency.png")
     plt.show()
 
 
 
 def analyze_latency():
-    _, _, filenames_without = next(os.walk("results_without_auto/"))
-    _, _, filenames_with = next(os.walk("results_rlc/"))
+    _, _, filenames_without = next(os.walk("results_without_10/"))
+    _, _, filenames_with = next(os.walk("results_rlc_3/"))
     # print(filenames_without)
 
     res_without = list()
@@ -203,43 +376,47 @@ def analyze_latency():
 
     # I forgot to use JSON format so I need to scrapt like a n00b
     for filename in tqdm(sorted(filenames_without)):
-        path = os.path.join("results_without_auto", filename)
+        path = os.path.join("results_without_10", filename)
         res_without.append(read_mqtt_run_json(path))
 
     # The same but for RLC
     for filename in tqdm(filenames_with):
-        path = os.path.join("results_rlc", filename)
+        path = os.path.join("results_rlc_3", filename)
         res_rlc.append(read_mqtt_run_json(path))
     
     print([int(i) for i in res_without if i > 50])
 
-    hist_without, bin_edges_without = np.histogram(res_without, bins=60, range=(20, 58), density=True)
-    hist_with, bin_edges_with = np.histogram(res_rlc, bins=60, range=(20, 58), density=True)
+    min_r = min(min(res_without), min(res_rlc)) - 1
+    max_r = max(max(res_without), max(res_rlc)) + 1
+
+    hist_without, bin_edges_without = np.histogram(res_without, bins=60, range=(min_r, max_r), density=True)
+    hist_with, bin_edges_with = np.histogram(res_rlc, bins=60, range=(min_r, max_r), density=True)
     dx = bin_edges_without[1] - bin_edges_without[0]
     cdf_without = np.cumsum(hist_without) * dx
     cdf_with = np.cumsum(hist_with) * dx
 
     fig, ax = plt.subplots()
-    ax.plot(bin_edges_without[1:], cdf_without, label="TCP", color=(173/255, 205/255, 224/255), linestyle="-")
-    ax.plot(bin_edges_with[1:], cdf_with, label="SRv6_FEC_RLC_6_3", color=(43/255, 68/255, 148/255), linestyle="-.")
+    ax.plot(bin_edges_without[1:], cdf_without, label="TCP", color="red", linestyle="-")
+    ax.plot(bin_edges_with[1:], cdf_with, label="RLC", color="darkblue", linestyle="-.")
 
-    ax.grid(axis="y")
+    ax.grid()
     ax.set_axisbelow(True)
 
     ax.set_ylabel("CDF")
-    ax.set_xlabel("Latency (ms)")
+    ax.set_xlabel("Latency [ms]")
     # plt.gca().xaxis.set_major_formatter(PercentFormatter(1))
 
     plt.legend(loc="best")
-    plt.savefig("mqtt_latency.svg")
-    plt.savefig("mqtt_latency.png")
+    plt.savefig("figures/exp_mqtt_latency_cdf.svg")
+    plt.savefig("figures/exp_mqtt_latency_cdf.png")
     plt.show()
 
 
 
 if __name__ == "__main__":
-    #analyze_latency()
+    # analyze_latency()
     # analyze_point_plot_same_K(90)
     # analyze_point_plot_same_D(2)
-    analyze_point_plot_idx()
-    # exchanged_bytes()
+    # analyze_point_plot_idx()
+    # exchanged_bytes(True)
+    loss_varying_delay(True)
