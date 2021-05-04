@@ -25,6 +25,13 @@ int decode_convo(struct __sk_buff *skb) {
     //if (DEBUG) bpf_printk("Receiver: BPF triggered from packet with SRv6!\n");
     int err;
     int k = 0;
+
+    /* First check if the packet can be protected in term of size 
+     * The packet is not dropped, just not protected */
+    if (skb->len > MAX_PACKET_SIZE) {
+        if (DEBUG) bpf_printk("Packet too big, cannot protect\n");
+        return BPF_OK;
+    }
     
     /* Get the Segment Routing Header of the packet */
     struct ip6_srh_t *srh = seg6_get_srh(skb);
@@ -73,6 +80,13 @@ int decode_block(struct __sk_buff *skb) {
     //if (DEBUG) bpf_printk("Receiver: BPF triggered from packet with SRv6!\n");
     int err;
     int k = 0;
+
+    /* First check if the packet can be protected in term of size 
+     * The packet is not dropped, just not protected */
+    if (skb->len > MAX_PACKET_SIZE) {
+        if (DEBUG) bpf_printk("Packet too big, cannot protect\n");
+        return BPF_OK;
+    }
     
     /* Get the Segment Routing Header of the packet */
     struct ip6_srh_t *srh = seg6_get_srh(skb);
