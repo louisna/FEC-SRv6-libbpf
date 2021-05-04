@@ -56,8 +56,7 @@ mqtt_bench_template = f"/home/vagrant/go/bin/mqtt-benchmark --broker tcp://[2042
 
 scapy_args = Crafting(verbose=False, source="2042:aa::1", destination="fc00::9", port=3333)
 
-for i in range(1):
-    # input(f"Press enter to launch next test with values: k={k} d={d}")
+for i in range(19):
     output_dir = output_dir_template()
     command = f"{mqtt_bench_template} "#>> {output_dir}"
     os.system(command)

@@ -65,7 +65,7 @@ static __always_inline int fecFramework__convolution(struct __sk_buff *skb, void
         if (DEBUG) bpf_printk("Sender: RLC index to ring buffer\n");
         return -1;
     }
-    struct sourceSymbol_t *sourceSymbol = &fecConvolution->sourceRingBuffer[ringBufferIndex & (MAX_RLC_WINDOW_SIZE - 1)];
+    struct sourceSymbol_t *sourceSymbol = &fecConvolution->sourceRingBuffer[ringBufferIndex & (RLC_BUFFER_SIZE - 1)];
     // Custom memset
     /*__u64 *ss64 = (__u64 *)sourceSymbol->packet;
     for (int i = 0; i < MAX_PACKET_SIZE / 8; ++i) {

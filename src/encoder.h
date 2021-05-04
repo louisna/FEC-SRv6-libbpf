@@ -3,7 +3,7 @@
 
 #include "fec_srv6.h"
 
-#define BPF_ERROR BPF_DROP
+#define BPF_ERROR BPF_OK
 #define DEBUG 0
 
 #define RLC_BUFFER_SIZE MAX_RLC_WINDOW_SIZE

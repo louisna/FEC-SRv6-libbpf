@@ -193,7 +193,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
         }
     }
     if (effective_window_check == 0) {
-        //printf("Snif\n");
+        printf("Snif\n");
         return -1;
     }
     //printf("Current encodingSymbolID is: %d\n", encodingSymbolID);

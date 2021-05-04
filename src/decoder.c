@@ -227,6 +227,8 @@ int main(int argc, char **argv)
     /* Bump RLIMIT_MEMLOCK to allow BPF sub-system to do anything :3 */
     bump_memlock_rlimit();
 
+    printf("Valeur de la window: %u\n", RLC_RECEIVER_BUFFER_SIZE);
+
     /* Clean handling of Ctrl+C */
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);

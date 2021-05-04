@@ -206,7 +206,7 @@ def exchanged_bytes(cdf=False):
             p_rlc.append(p)
         
         # Dummy plots
-            p5, = plt.plot([0], marker='None',
+        p5, = plt.plot([0], marker='None',
             linestyle='None', label='dummy-tophead')
 
         ax.set_xlabel("Value of the 'd' parameter of the Markov dropper model")
