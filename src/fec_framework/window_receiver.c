@@ -138,7 +138,7 @@ static __always_inline int receiveRepairSymbol__convolution(struct __sk_buff *sk
     /* Get pointer to information of the window */
     window_info_t *window_info = &fecConvolution->windowInfoBuffer[windowRingBufferIndex & (RLC_RECEIVER_BUFFER_SIZE - 1)];
     // TODO: check if already received repair symbol ?
-    bpf_printk("Will store a repair symbol with encodingSymbolID=%u at index %u\n", encodingSymbolID, windowRingBufferIndex & (RLC_RECEIVER_BUFFER_SIZE - 1));
+    //bpf_printk("Will store a repair symbol with encodingSymbolID=%u at index %u\n", encodingSymbolID, windowRingBufferIndex & (RLC_RECEIVER_BUFFER_SIZE - 1));
     struct repairSymbol_t *repairSymbol = &window_info->repairSymbol;
 
     /* Store repair symbol */

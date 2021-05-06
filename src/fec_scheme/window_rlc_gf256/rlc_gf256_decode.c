@@ -392,7 +392,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
             // TODO: send the packet
             //print_recovered(recovered);
             ++total_recovered;
-            printf("Recovered source symbols with ID=%u, total recovered=%d\n", recovered->encodingSymbolID, total_recovered);
+            //printf("Recovered source symbols with ID=%u, total recovered=%d\n", recovered->encodingSymbolID, total_recovered);
             err = send_raw_socket_recovered(sfd, recovered, local_addr);
             if (err < 0) {
                 fprintf(stderr, "Error during sending the packet, drop\n");

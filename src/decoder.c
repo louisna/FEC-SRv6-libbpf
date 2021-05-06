@@ -15,7 +15,6 @@
 // #include "fec/fec.c"
 #include "raw_socket_receiver.c"
 #include "fec_scheme/window_rlc_gf256/rlc_gf256_decode.c"
-
 #include <arpa/inet.h>
 #include <netinet/ip6.h>
 #include <netinet/ip.h>
@@ -92,6 +91,8 @@ static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
     //debug_print(fecConvolution);
 
     ++globalCount;
+
+    //if (globalCount % 1000 == 0) printf("Coucou\n");
 
     /* Generate the repair symbol */
     int err = rlc__fec_recover(fecConvolution, rlc, sfd, local_addr);
