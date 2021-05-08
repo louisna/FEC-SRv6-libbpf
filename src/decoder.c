@@ -92,7 +92,7 @@ static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
 
     ++globalCount;
 
-    //if (globalCount % 1000 == 0) printf("Coucou\n");
+    if (globalCount % 1000 == 0) printf("Coucou\n");
 
     /* Generate the repair symbol */
     int err = rlc__fec_recover(fecConvolution, rlc, sfd, local_addr);

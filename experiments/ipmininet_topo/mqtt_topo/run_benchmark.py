@@ -51,14 +51,14 @@ signal.signal(signal.SIGINT, signal_handler)
 print('Press Ctrl+C')
 
 #output_dir_template = lambda: f"/Volumes/LOUIS/thesis/results_without/mqtt_res_run_{i}.json"
-output_dir_template = lambda: f"mqtt_topo/results_rlc_delay/mqtt_res_run_5_{i}.json"
-mqtt_bench_template = f"/home/vagrant/go/bin/mqtt-benchmark --broker tcp://[2042:dd::1]:1883 --clients 3 --count 400 --format json"
+output_dir_template = lambda: f"mqtt_topo/results_without_2500/mqtt_res_run_10_{i}.json"
+mqtt_bench_template = f"/home/vagrant/go/bin/mqtt-benchmark --broker tcp://[2042:dd::1]:1883 --clients 3 --count 2500 --format json"
 
-scapy_args = Crafting(verbose=False, source="2042:aa::1", destination="fc00::9", port=3333)
+scapy_args = Crafting(verbose=False, source="2042:aa::1", destination="2042:dd::1", port=3333)
 
-for i in range(19):
+for i in range(48, 100):
     output_dir = output_dir_template()
-    command = f"{mqtt_bench_template} "#>> {output_dir}"
+    command = f"{mqtt_bench_template} >> {output_dir}"
     os.system(command)
 
     # Notify the dropper that we can update the parameters for the next state

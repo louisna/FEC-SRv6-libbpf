@@ -321,7 +321,7 @@ int send_raw_socket_recovered(int sfd, const recoveredSource_t *repairSymbol, st
         uint16_t udp_len = repairSymbol->packet_length - ip6_length - srh_len;
         //printf("UDP length is: %u\n", udp_len);
         compute_udp_checksum(iphdr, (uint16_t *)udp, udp_len);
-        printf("UDP checksum: %x\n", udp->uh_sum);
+        //printf("UDP checksum: %x\n", udp->uh_sum);
     }
 
     /* Send packet */

@@ -318,7 +318,7 @@ def exchanged_bytes(cdf=False, boxplot=True):
 
 
 def analyze_point_plot_idx(boxplot):
-    _, _, filenames_without = next(os.walk("results_without_10/"))
+    _, _, filenames_without = next(os.walk("results_without_2500/"))
     _, _, filenames_with = next(os.walk("results_rlc_3/"))
 
     sorted_filenames_without = sorted(filenames_without, key=sort_list_by_idx)
@@ -342,9 +342,9 @@ def analyze_point_plot_idx(boxplot):
     res_by_k = []
     for k in range(10):
         res_by_d = []
-        for d in range(49):
+        for d in range(10):
             filename = sorted_filenames_without[idx]
-            path = os.path.join("results_without_10", filename)
+            path = os.path.join("results_without_2500", filename)
             res_by_d.append(read_mqtt_run_json(path))
             idx += 1
         res_by_k.append(res_by_d)
@@ -484,6 +484,6 @@ if __name__ == "__main__":
     # analyze_latency()
     # analyze_point_plot_same_K(90)
     # analyze_point_plot_same_D(2)
-    analyze_point_plot_idx(boxplot=True)
+    analyze_point_plot_idx(boxplot=False)
     # exchanged_bytes(boxplot=True)
     # loss_varying_delay(True)
