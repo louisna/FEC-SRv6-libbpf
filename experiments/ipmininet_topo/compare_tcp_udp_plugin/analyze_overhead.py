@@ -93,15 +93,18 @@ def scrap_cw(filename):
     # Skip 3 first lines and get the cw value
     # Only 45 lines to read
     res = []
-    for line in data[3:3+45]:
-        scale = line.split()[-1]
-        value = float(line.split()[-2])
-        if scale == "KBytes":
-            res.append(value)
-        elif scale == "MBytes":
-            res.append(value * 1000)
-        else:
-            res.append(value / 1000)   
+    bytes_str = ["MBytes", "Bytes", "KBytes"]
+    for line in data:
+        if len(line.split()) == 0: continue
+        if line.split()[-1] in bytes_str:
+            scale = line.split()[-1]
+            value = float(line.split()[-2])
+            if scale == "KBytes":
+                res.append(value)
+            elif scale == "MBytes":
+                res.append(value * 1000)
+            else:
+                res.append(value / 1000)   
     return res
 
 
@@ -125,6 +128,26 @@ def scrap_udp_loss(filename):
         if total >= 100:
             break
     return res_loss
+
+
+def scrap_total_time(filename):
+    with open(filename, "r") as fd:
+        data = fd.readlines()
+    total_read = 0
+    res_time = []
+    res_retr = []
+    for line in data:
+        if len(line.split()) == 0: continue
+        if line.split()[-1] == "sender":
+            data_line = line.split()
+            total_read += 1
+            retr = int(data_line[-2])
+            total_time = float(data_line[2].split("-")[1])
+            res_time.append(total_time)
+            res_retr.append(retr)
+        if total_read == 3: break
+    return np.median(res_retr), np.median(res_time)
+
 
 
 def scrap_udp_jitter(filename):
@@ -193,8 +216,8 @@ def analyze_tpc_congestion_window_one():
 
 
 def analyze_tpc_congestion_window_all(analyze_function=scrap_cw, boxplot=False, min_max_ext=True):
-    _, _, filenames_without = next(os.walk("markov_30_without/"))
-    _, _, filenames_rlc = next(os.walk("markov_30_rlc/"))
+    _, _, filenames_without = next(os.walk("results_09_05/tcp_quality_without/"))
+    _, _, filenames_rlc = next(os.walk("results_09_05/tcp_quality_rlc/"))
     nb_exp = 19
     idxs_to_plot = np.arange(100, 89.5, -0.5)
 
@@ -203,62 +226,58 @@ def analyze_tpc_congestion_window_all(analyze_function=scrap_cw, boxplot=False, 
     res_without = []
     res_rlc = []
     for filename in sorted_filenames_without:
-        path = os.path.join("markov_30_without", filename)
+        path = os.path.join("results_09_05/tcp_quality_without", filename)
         res_without.append(analyze_function(path))
 
     for filename in sorted_filenames_rlc:
-        path = os.path.join("markov_30_rlc", filename)
+        path = os.path.join("results_09_05/tcp_quality_rlc", filename)
         res_rlc.append(analyze_function(path))
 
-    to_plot = np.array([100, 99, 95, 90])
-    tp = [100, 99, 95, 90]
+    to_plot = np.array([99, 96, 93, 90])
+    d_idx = np.arange(0, 50, 2)
+    tp = [99, 96, 93, 90]
     tp_str = ["k=" + str(i) for i in tp]
     linestyles = ["-", "--", "-.", ":"]
     colors_without = ["lightcoral", "red", "firebrick", "darkred"]
     colors_rlc = ["slategrey", "darkcyan", "royalblue", "darkblue"]
+    col_names = ["k=" + str(i) for i in tp]
+    row_names = ["TCP", "RLC"]
+
+    # Get by k
+    cw_without_by_k = []
+    cw_rlc_by_k = []
+    for k in range(4):
+        by_d = []
+        by_d_rlc = []
+        for d in range(25):
+            idx = k * 26 + d
+            by_d.append(res_without[idx])
+            by_d_rlc.append(res_rlc[idx])
+        cw_without_by_k.append(by_d)
+        cw_rlc_by_k.append(by_d_rlc)
 
     if boxplot:
-        fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True, figsize=(12, 5))
-        ax1.grid(axis="y")
-        ax1.set_axisbelow(True)
-        ax2.grid(axis="y")
-        ax2.set_axisbelow(True)
-        width = 0.5
-        min_without = []  # Min for each exp
-        max_without = []
-        med_without = []
-        min_rlc = []
-        max_rlc = []
-        med_rlc = []
+        fig, (ax) = plt.subplots(2, 4, sharey=True, sharex=True, figsize=(12, 5))
+        for axl in ax:
+            for axi in axl:
+                axi.grid(axis="y")
+                axi.set_axisbelow(True)
 
-        for without in res_without:
-            min_without.append(np.min(without))
-            max_without.append(np.max(without))
-            med_without.append(np.median(without))
-        for rlc in res_rlc:
-            min_rlc.append(np.min(rlc))
-            max_rlc.append(np.max(rlc))
-            med_rlc.append(np.median(rlc))
-        
-        ax1.plot(idxs_to_plot, min_without, color="red")
-        ax1.plot(idxs_to_plot, max_without, color="darkred")
-        ax1.plot(idxs_to_plot, med_without, color="pink")
-
-        ax2.plot(idxs_to_plot, min_rlc, color="green")
-        ax2.plot(idxs_to_plot, max_rlc, color="grey")
-        ax2.plot(idxs_to_plot, med_rlc, color="blue")
-        ax1.boxplot(res_without, positions=idxs_to_plot, showfliers=False)
-        ax2.boxplot(res_rlc, positions=idxs_to_plot, showfliers=False)
-        ax1.set_yscale("log")
-        ax2.set_yscale("log")
-        for label in ax1.get_xticklabels()[1::2]:
-            label.set_visible(False)
-        for label in ax2.get_xticklabels()[1::2]:
-            label.set_visible(False)
-        ax1.invert_xaxis()
-        ax2.invert_xaxis()
-        ax1.set_title("TCP")
-        ax2.set_title("RLC")
+        for i, k in enumerate(cw_without_by_k):
+            ax[0][i].boxplot(k, positions=d_idx, showfliers=False, widths=1.5)
+            ax[0][i].set_yscale("log")
+        for i, k in enumerate(cw_rlc_by_k):
+            ax[1][i].boxplot(k, positions=d_idx, showfliers=False, widths=1.5)
+            ax[1][i].set_yscale("log")
+        for axl in ax:
+            for axi in axl:
+                for idx, label in enumerate(axi.get_xticklabels()):
+                    if idx % 5 != 0:
+                        label.set_visible(False)
+        for axc, col in zip(ax[0], col_names):
+            axc.set_title(col)
+        for axr, row in zip(ax[:, 0], row_names):
+            axr.set_ylabel(row)
 
         # https://stackoverflow.com/questions/6963035/pyplot-axes-labels-for-subplots
         # add a big axes, hide frame
@@ -266,8 +285,10 @@ def analyze_tpc_congestion_window_all(analyze_function=scrap_cw, boxplot=False, 
         # hide tick and tick label of the big axes
         plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
         plt.grid(False)
-        plt.xlabel("Value of the 'k' parameter of the Markov model")
-        plt.ylabel("TCP Congestion Window [kB]")
+        plt.xlabel("Value of the 'd' parameter of the Markov model")
+        # plt.ylabel("TCP Congestion Window [kB]")
+        fig.tight_layout()
+        fig.subplots_adjust(left=0.15, top=0.95)
         plt.savefig("figures/exp_tcp_congestion_window_boxplot.svg")
         plt.show()
     elif min_max_ext:
@@ -337,11 +358,88 @@ def analyze_udp_loss(cdf=False, boxplot=False):
         #plt.boxplot(res_d_equal_30_without)
         plt.boxplot(res_d_equal_30_rlc)
         plt.show()
-                
 
+
+def analyze_tcp_quality():
+    _, _, filenames_without = next(os.walk("results_09_05/tcp_quality_without/"))
+    _, _, filenames_rlc = next(os.walk("results_09_05/tcp_quality_rlc/"))
+
+    sorted_filenames_without = sorted(filenames_without, key=sort_list_by_idx)
+    sorted_filenames_rlc = sorted(filenames_rlc, key=sort_list_by_idx)
+
+    time_without = []
+    retr_without = []
+    time_rlc = []
+    retr_rlc = []
+    for filename in sorted_filenames_without:
+        path = os.path.join("results_09_05/tcp_quality_without", filename)
+        retr, time = scrap_total_time(path)
+        time_without.append(time)
+        retr_without.append(retr)
+    for filename in sorted_filenames_rlc:
+        path = os.path.join("results_09_05/tcp_quality_rlc", filename)
+        retr, time = scrap_total_time(path)
+        time_rlc.append(time)
+        retr_rlc.append(retr)
+    
+    baseline_retr, baseline_time = scrap_total_time("results_09_05/mqtt_res_run_10_baseline.json")
+    
+    # Get by k
+    time_without_by_k = []
+    time_rlc_by_k = []
+    for k in range(4):
+        by_d = []
+        by_d_rlc = []
+        for d in range(25):
+            idx = k * 26 + d
+            by_d.append(time_without[idx])
+            by_d_rlc.append(time_rlc[idx])
+        time_without_by_k.append(by_d)
+        time_rlc_by_k.append(by_d_rlc)
+    
+    # Plot args
+    fir, ax = plt.subplots()
+    ax.grid()
+    ax.set_axisbelow(True)
+    k_idx = [99, 96, 93, 90]
+    d_idx = np.arange(0, 50, 2)
+    tp_str = ["k=" + str(i) for i in k_idx]  # Legend string
+    linestyles = ["-", "--", "-.", ":"]
+    colors_without = ["lightcoral", "red", "firebrick", "darkred"]
+    colors_rlc = ["slategrey", "darkcyan", "royalblue", "darkblue"]
+    p_without = []  # Legend link
+    p_rlc = []
+
+    plt.plot([0, 48], [baseline_time - 0.5] * 2, color="black")
+    
+    for i, k in enumerate(time_without_by_k):
+        p, = plt.plot(d_idx, k, linestyle=linestyles[i], color=colors_without[i])
+        p_without.append(p)
+        pass
+    for i, k in enumerate(time_rlc_by_k):
+        p, = plt.plot(d_idx, [j + (i + 1) * 0.5 for j in k], linestyle=linestyles[i], color=colors_rlc[i])
+        p_rlc.append(p)
+        pass
+    
+    # Dummy plot
+    p5, = plt.plot([0], marker='None',
+        linestyle='None', label='dummy-tophead')
+
+    ax.set_xlabel("Value of the 'd' parameter of the Markov dropper model")
+    ax.set_ylabel("Completion time [s]")
+    # plt.legend(ncol=2,handleheight=2.4, labelspacing=0.05)
+    leg3 = plt.legend([p5] + p_without + [p5] + p_rlc,
+            ["TCP"] + tp_str + ["RLC"] + tp_str,
+            loc=2, ncol=2) # Two columns, vertical group labels
+        
+    # plt.ylim((15, 100))
+    #plt.yscale("log")
+    plt.savefig("figures/tcp_quality_time.svg")
+    plt.show()
 
 
 if __name__ == "__main__":
     # plugin_overhead()
-    analyze_tpc_congestion_window_all(scrap_cw, boxplot=True)
+    # analyze_tpc_congestion_window_all(scrap_cw, boxplot=True)
     # analyze_udp_loss(cdf=True, boxplot=True)
+    analyze_tcp_quality()

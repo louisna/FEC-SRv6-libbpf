@@ -29,7 +29,6 @@ def read_mqtt_run_scrap(filename):
         line_client_i = lines[value_offset + client_offset * i]
         time_mean_client_i = float(line_client_i.split()[-1])
         clients_res.append(time_mean_client_i)
-    
 
     # Compute the median from all clients
     return np.median(clients_res)
@@ -39,13 +38,37 @@ def read_mqtt_run_json(filename):
     with open(filename, "r") as fd:
         data = json.load(fd)
     
-    return data["totals"]["msg_time_mean_avg"]
-    
     clients_res = [i["msg_time_mean"] for i in data["runs"]]
 
     # Compute the median for all clients
     # print(clients_res)
     return np.median(clients_res)
+
+
+def scrap_mqtt_json_multiple_run(filename):
+    with open(filename, "r") as fd:
+        data = fd.readlines()
+    
+    res_by_run = []
+
+    total = 0
+    for i, line in enumerate(data):
+        if line.split()[0] == '"totals":':
+            interest = data[i + 8].split()[-1][:-1]  # Avoid the ','
+            res_by_run.append(float(interest))
+            total += 1
+            if total == 3: break
+    
+    print(res_by_run)
+    
+    return np.median(res_by_run)
+
+
+def rewrite_json(filename):
+    with open(filename, "r+") as fd:
+        content = fd.read()
+        fd.seek(0, 0)
+        fd.write("[\n" + content + "]")
 
 
 def read_mqtt_run_json_all(filename):
@@ -149,13 +172,13 @@ def loss_varying_delay(MARKOV=True):
 def exchanged_bytes(cdf=False, boxplot=True):
     data_without = []
     data_rlc = []
-    with open("trace_pipe_without.txt", "r") as fd:
+    with open("dropper_run_10_without_3_2500.txt", "r") as fd:
         data = fd.readlines()
         for line in data:
             tab = line.split()
             if tab[-3] == "Total":  # Line indicating number of bytes
                 data_without.append(int(tab[-1]))
-    with open("trace_pipe_rlc.txt", "r") as fd:
+    with open("dropper_run_10_rlc_2_2500.txt", "r") as fd:
         data = fd.readlines()
         for line in data:
             tab = line.split()
@@ -165,18 +188,18 @@ def exchanged_bytes(cdf=False, boxplot=True):
     # Now separate in subtabs
     data_without_by_k = []
     i = 0
-    for k in range(10):
+    for k in range(4):
         by_d = []
-        for d in range(49):
+        for d in range(26):
             by_d.append(data_without[i])
             i += 1
         data_without_by_k.append(by_d)
     
     data_rlc_by_k = []
     i = 0
-    for k in range(10):
+    for k in range(4):
         by_d = []
-        for d in range(49):
+        for d in range(26):
             by_d.append(data_rlc[i])
             i += 1
         data_rlc_by_k.append(by_d)
@@ -231,11 +254,12 @@ def exchanged_bytes(cdf=False, boxplot=True):
 
             p_without = []
             p_rlc = []
+            print(without_normalized)
             
-            for idx, i in enumerate(abs(to_plot - 99)):
+            for idx, i in enumerate(range(4)):
                 p, = ax.plot(without_normalized[i], color=colors_without[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
                 p_without.append(p)
-            for idx, i in enumerate(abs(to_plot - 99)):
+            for idx, i in enumerate(range(4)):
                 p, = ax.plot(rlc_normalized[i], color=colors_rlc[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
                 p_rlc.append(p)
             
@@ -253,7 +277,7 @@ def exchanged_bytes(cdf=False, boxplot=True):
             ax.set_axisbelow(True)
 
             # plt.title("Data sent by the MQTT clients (+ the UDP traffic)\nDepending on k and d from the Markov loss model")
-            plt.ylim((150, 750))
+            #plt.ylim((150, 750))
             plt.savefig("figures/mqtt_bytes_exchanged.svg")
             plt.savefig("figures/mqtt_bytes_exchanged.png")
             plt.show()
@@ -319,7 +343,12 @@ def exchanged_bytes(cdf=False, boxplot=True):
 
 def analyze_point_plot_idx(boxplot):
     _, _, filenames_without = next(os.walk("results_without_2500/"))
-    _, _, filenames_with = next(os.walk("results_rlc_3/"))
+    _, _, filenames_with = next(os.walk("results_rlc_2500/"))
+
+    #for filename in filenames_without:
+    #    rewrite_json(os.path.join("results_without_2500", filename))
+    #for filename in filenames_with:
+    #    rewrite_json(os.path.join("results_rlc_2500", filename))
 
     sorted_filenames_without = sorted(filenames_without, key=sort_list_by_idx)
     sorted_filenames_with = sorted(filenames_with, key=sort_list_by_idx)
@@ -338,26 +367,28 @@ def analyze_point_plot_idx(boxplot):
         path = os.path.join("results_rlc_3", filename)
         res_rlc.append(read_mqtt_run_json_all(path))"""
     
+    baseline = scrap_mqtt_json_multiple_run("results_without_2500/mqtt_res_run_10_-1.json")
+    
     idx = 0
     res_by_k = []
-    for k in range(10):
+    for k in range(4):
         res_by_d = []
-        for d in range(10):
+        for d in range(26):
             filename = sorted_filenames_without[idx]
             path = os.path.join("results_without_2500", filename)
-            res_by_d.append(read_mqtt_run_json(path))
+            res_by_d.append(scrap_mqtt_json_multiple_run(path))
             idx += 1
         res_by_k.append(res_by_d)
     
 
     idx = 0
     res_by_k_rlc = []
-    for k in range(10):
+    for k in range(4):
         res_by_d = []
-        for d in range(49):
-            filename = sorted_filenames_without[idx]
-            path = os.path.join("results_rlc_3", filename)
-            res_by_d.append(read_mqtt_run_json(path))
+        for d in range(26):
+            filename = sorted_filenames_with[idx]
+            path = os.path.join("results_rlc_2500", filename)
+            res_by_d.append(scrap_mqtt_json_multiple_run(path))
             idx += 1
         res_by_k_rlc.append(res_by_d)
     
@@ -407,12 +438,15 @@ def analyze_point_plot_idx(boxplot):
         p_without = []
         p_rlc = []
 
-        for idx, i in enumerate(abs(to_plot - 99)):
+        ax.plot([0, 10], [baseline] * 2, color="black", linestyle=":", label="Baseline TCP", linewidth=3)
+
+        for idx, i in enumerate(range(4)):
             p, = ax.plot(res_by_k[i], color=colors_without[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
             p_without.append(p)
-        for idx, i in enumerate(abs(to_plot - 99)):
+        for idx, i in enumerate(range(4)):
             p, = ax.plot(res_by_k_rlc[i], color=colors_rlc[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
             p_rlc.append(p)
+            pass
         
         # Dummy plot
         p5, = plt.plot([0], marker='None',
@@ -485,5 +519,5 @@ if __name__ == "__main__":
     # analyze_point_plot_same_K(90)
     # analyze_point_plot_same_D(2)
     analyze_point_plot_idx(boxplot=False)
-    # exchanged_bytes(boxplot=True)
+    # exchanged_bytes(boxplot=False)
     # loss_varying_delay(True)
