@@ -59,4 +59,7 @@ dkms.conf
 *.png
 src/.output/
 src/decoder
-src/encoder 
+src/encoder
+*.txt
+*.json
+*.zip 
