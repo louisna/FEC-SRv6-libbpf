@@ -9,8 +9,7 @@
 
 uint8_t gf256_mul(uint8_t a, uint8_t b, uint8_t *mul) { 
     return mul[a * 256 + b];
-    }
-
+}
 
 uint8_t gf256_mul_formula(uint8_t a, uint8_t b) {
     uint8_t p = 0;

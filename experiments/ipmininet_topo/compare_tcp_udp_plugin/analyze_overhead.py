@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import os
+import json
+import yaml
+from tqdm import tqdm
 
 
 def sort_list_by_idx(filename):
@@ -172,15 +175,39 @@ def scrap_udp_jitter(filename):
     return res_loss
 
 
+def json_tcp_time(filename):
+    print(filename)
+    with open(filename, "r") as fd:
+        import re
+        data = fd.readlines()
+        data_string = "".join(data)
+        data_clean = re.sub("}\n,\n]", "}\n]", data_string)
+        data_clean = re.sub("}\n{", "}\n,\n{", data_clean)
+        data_json = json.loads(data_clean)
+    
+    loss = []
+    retr = []
+    for run in data_json:
+        try:
+            loss.append(run["end"]["sum_received"]["seconds"])
+            retr.append(run["end"]["sum_sent"]["retransmits"])
+        except KeyError:
+            continue
+    return np.median(retr), np.median(loss)
+
+
 def scrap_retransmission(filename):
     with open(filename, "r") as fd:
         data = fd.readlines()
     
-    # Skip first lines and get the cw value
+    # Skip 3 first lines and get the cw value
+    # Only 45 lines to read
     res = []
-    for line in data[3:3+45]:
-        retr = int(line.split()[-3])
-        res.append(retr)
+    bytes_str = ["MBytes", "Bytes", "KBytes"]
+    for line in data:
+        if len(line.split()) == 0: continue
+        if line.split()[-1] in bytes_str:  # Line of interest
+            retr = line.split  
     return res
         
 
@@ -398,7 +425,7 @@ def analyze_tcp_quality():
         time_rlc_by_k.append(by_d_rlc)
     
     # Plot args
-    fir, ax = plt.subplots()
+    fig, ax = plt.subplots()
     ax.grid()
     ax.set_axisbelow(True)
     k_idx = [99, 96, 93, 90]
@@ -438,8 +465,289 @@ def analyze_tcp_quality():
     plt.show()
 
 
+def analyze_retransmission():
+    _, _, filenames_without = next(os.walk("results_09_05/tcp_quality_without/"))
+    _, _, filenames_rlc = next(os.walk("results_09_05/tcp_quality_rlc/"))
+
+    sorted_filenames_without = sorted(filenames_without, key=sort_list_by_idx)
+    sorted_filenames_rlc = sorted(filenames_rlc, key=sort_list_by_idx)
+
+    time_without = []
+    retr_without = []
+    time_rlc = []
+    retr_rlc = []
+    for filename in sorted_filenames_without:
+        path = os.path.join("results_09_05/tcp_quality_without", filename)
+        retr, time = scrap_total_time(path)
+        time_without.append(time)
+        retr_without.append(retr)
+    for filename in sorted_filenames_rlc:
+        path = os.path.join("results_09_05/tcp_quality_rlc", filename)
+        retr, time = scrap_total_time(path)
+        time_rlc.append(time)
+        retr_rlc.append(retr)
+    
+    baseline_retr, baseline_time = scrap_total_time("results_09_05/mqtt_res_run_10_baseline.json")
+    
+    # Get by k
+    retr_without_by_k = []
+    retr_rlc_by_k = []
+    for k in range(4):
+        by_d = []
+        by_d_rlc = []
+        for d in range(25):
+            idx = k * 26 + d
+            by_d.append(retr_without[idx])
+            by_d_rlc.append(retr_rlc[idx])
+        retr_without_by_k.append(by_d)
+        retr_rlc_by_k.append(by_d_rlc)
+    
+    # Plot args
+    fig, ax = plt.subplots()
+    ax.grid()
+    ax.set_axisbelow(True)
+    k_idx = [99, 96, 93, 90]
+    d_idx = np.arange(0, 50, 2)
+    tp_str = ["k=" + str(i) for i in k_idx]
+    linestyles = ["-", "--", "-.", ":"]
+    colors_without = ["lightcoral", "red", "firebrick", "darkred"]
+    colors_rlc = ["slategrey", "darkcyan", "royalblue", "darkblue"]
+    p_without = []  # Legend link
+    p_rlc = []
+
+    plt.plot([0, 48], [baseline_retr] * 2, color="black")
+
+    for i, k in enumerate(retr_without_by_k):
+        p, = plt.plot(d_idx, k, linestyle=linestyles[i], color=colors_without[i])
+        p_without.append(p)
+    for i, k  in enumerate(retr_rlc_by_k):
+        p,  = plt.plot(d_idx, k, linestyle=linestyles[i], color=colors_rlc[i])
+        p_rlc.append(p)
+    
+    # Dummy plot
+    p5, = plt.plot([0], marker='None',
+        linestyle='None', label='dummy-tophead')
+
+    ax.set_xlabel("Value of the 'd' parameter of the Markov dropper model")
+    ax.set_ylabel("Number of retransmission during the connection")
+    # plt.legend(ncol=2,handleheight=2.4, labelspacing=0.05)
+    leg3 = plt.legend([p5] + p_without + [p5] + p_rlc,
+            ["TCP"] + tp_str + ["RLC"] + tp_str,
+            loc=2, ncol=2) # Two columns, vertical group labels
+        
+    # plt.ylim((15, 100))
+    # plt.yscale("log")
+    plt.savefig("figures/exp_tcp_retransmissions.svg")
+    plt.show()
+
+
+def json_udp_loss(filename, jitter=False):
+    with open(filename, "r") as fd:
+        import re
+        data = fd.readlines()
+        data_string = "".join(data)
+        data_clean = re.sub("}\n,\n]", "}\n]", data_string)
+        data_json = json.loads(data_clean)
+    
+    loss = []
+    for run in data_json:
+        try:
+            if jitter:
+                loss.append(run["end"]["sum"]["jitter_ms"])
+            else:
+                loss.append(run["end"]["sum"]["lost_percent"])
+        except KeyError:
+            continue
+    return np.median(loss)  
+
+
+def analyze_udp_traffic(cdf=False, jitter=False):
+    _, _, filenames_without = next(os.walk("results_13_05/udp_without/"))
+    _, _, filenames_rlc = next(os.walk("results_13_05/udp_rlc/"))
+    _, _, filenames_xor = next(os.walk("results_13_05/udp_xor/"))
+
+    sorted_filenames_without = sorted(filenames_without, key=sort_list_by_idx)
+    sorted_filenames_rlc = sorted(filenames_rlc, key=sort_list_by_idx)
+    sorted_filenames_xor = sorted(filenames_xor, key=sort_list_by_idx)
+
+    loss_without = []
+    loss_rlc = []
+    loss_xor = []
+
+    for filename in tqdm(sorted_filenames_without):
+        path = os.path.join("results_13_05/udp_without", filename)
+        loss_without.append(json_udp_loss(path, jitter=jitter))
+    
+    for filename in tqdm(sorted_filenames_rlc):
+        path = os.path.join("results_13_05/udp_rlc", filename)
+        loss_rlc.append(json_udp_loss(path, jitter=jitter))
+    
+    for filename in tqdm(sorted_filenames_xor):
+        path = os.path.join("results_13_05/udp_xor", filename)
+        loss_xor.append(json_udp_loss(path, jitter=jitter))
+    
+    loss_without_by_k = []
+    loss_rlc_by_k = []
+    loss_xor_by_k = []
+
+    for k in range(4):
+        by_d_without = []
+        by_d_rlc = []
+        by_d_xor = []
+        for d in range(26):
+            idx = k * 26 + d
+            by_d_without.append(loss_without[idx])
+            by_d_rlc.append(loss_rlc[idx])
+            by_d_xor.append(loss_xor[idx])
+        loss_without_by_k.append(by_d_without)
+        loss_rlc_by_k.append(by_d_rlc)
+        loss_xor_by_k.append(by_d_xor)
+    
+    fig, ax = plt.subplots()
+    ax.grid()
+    ax.set_axisbelow(True)
+
+    print(loss_xor_by_k)
+
+    if cdf:
+        max_val = max([max(loss_without), max(loss_rlc), max(loss_xor)])
+        hist_without, bin_edges_without = np.histogram(loss_without, bins=60, range=(0, max_val + 0.5), density=True)
+        hist_rlc, bin_edges_rlc = np.histogram(loss_rlc, bins=60, range=(0, max_val + 0.5), density=True)
+        hist_xor, bin_edges_xor = np.histogram(loss_xor, bins=60, range=(0, max_val + 0.5), density=True)
+        dx = bin_edges_without[1] - bin_edges_without[0]
+        cdf_without = np.cumsum(hist_without) * dx
+        cdf_rlc = np.cumsum(hist_rlc) * dx
+        cdf_xor = np.cumsum(hist_xor) * dx
+
+        # Dummy values
+        cdf_rlc = np.insert(cdf_rlc, 0, 0)
+        cdf_without = np.insert(cdf_without, 0, 0)
+        cdf_xor = np.insert(cdf_xor, 0, 0)
+        bin_edges_rlc = [0] + bin_edges_rlc
+        bin_edges_without = [0] + bin_edges_without
+        bin_edges_xor = [0] + bin_edges_xor
+
+        ax.plot(bin_edges_without, cdf_without, label="UDP", color="red", linestyle="-")
+        ax.plot(bin_edges_rlc, cdf_rlc, label="RLC", color="darkblue", linestyle="-.")
+        ax.plot(bin_edges_xor, cdf_xor, label="XOR", color="green", linestyle=":")
+        if jitter:
+            ax.set_xlabel("Jitter [ms]")
+        else:
+            ax.set_xlabel("Percentage of loss during the benchmark [%]")
+        ax.set_ylabel("CDF")
+        plt.legend(loc="best")
+        if jitter:
+            plt.savefig("figures/exp_udp_jitter_cdf.svg")
+        else:
+            plt.savefig("figures/exp_udp_loss_cdf.svg")
+        plt.show()
+    else:
+        k_idx = [99, 96, 93, 90]
+        d_idx = np.arange(0, 51, 2)
+        tp_str = ["k=" + str(i) for i in k_idx]
+        linestyles = ["-", "--", "-.", ":"]
+        colors_without = ["lightcoral", "red", "firebrick", "darkred"]
+        colors_rlc = ["slategrey", "darkcyan", "royalblue", "darkblue"]
+        colors_xor = ["gold", "yellowgreen", "lightgreen", "darkgreen"]
+        p_without = []  # Legend link
+        p_rlc = []
+        p_xor = []
+
+        for i, k in enumerate(loss_without_by_k):
+            p, = plt.plot(d_idx, k, linestyle=linestyles[i], color=colors_without[i])
+            p_without.append(p)
+        for i, k  in enumerate(loss_rlc_by_k):
+            p,  = plt.plot(d_idx, k, linestyle=linestyles[i], color=colors_rlc[i])
+            p_rlc.append(p)
+        for i, k  in enumerate(loss_xor_by_k):
+            p,  = plt.plot(d_idx, k, linestyle=linestyles[i], color=colors_xor[i])
+            p_xor.append(p)
+
+        # Dummy plot
+        p5, = plt.plot([0], marker='None',
+            linestyle='None', label='dummy-tophead')
+
+        ax.set_xlabel("Value of the 'd' parameter of the Markov dropper model")
+        if jitter:
+            ax.set_ylabel("Jitter [ms]")
+        else:    
+            ax.set_ylabel("Percentage of loss during the benchmark [%]")
+        # plt.legend(ncol=2,handleheight=2.4, labelspacing=0.05)
+        leg3 = plt.legend([p5] + p_without + [p5] + p_rlc + [p5] + p_xor,
+                ["TCP"] + tp_str + ["RLC"] + tp_str + ["XOR"] + tp_str,
+                loc=2, ncol=3) # Two columns, vertical group labels
+        if jitter:
+            plt.savefig("figures/exp_udp_jitter.svg")
+        else:
+            plt.savefig("figures/exp_udp_loss.svg")
+        plt.show()
+
+
+def rlc_vs_udp():
+    _, _, filenames_rlc = next(os.walk("results_13_05/udp_rlc/"))
+    _, _, filenames_xor = next(os.walk("results_13_05/udp_xor/"))
+
+    sorted_filenames_rlc = sorted(filenames_rlc, key=sort_list_by_idx)
+    sorted_filenames_xor = sorted(filenames_rlc, key=sort_list_by_idx)
+
+    loss_rlc = []
+    jitt_rlc = []
+    loss_xor = []
+    jitt_xor = []
+    
+    for filename in tqdm(sorted_filenames_rlc):
+        path = os.path.join("results_13_05/udp_rlc", filename)
+        loss_rlc.append(100 - json_udp_loss(path, jitter=False))
+        jitt_rlc.append(json_udp_loss(path, jitter=True))
+    
+    for filename in tqdm(sorted_filenames_xor):
+        path = os.path.join("results_13_05/udp_xor", filename)
+        loss_xor.append(100 - json_udp_loss(path, jitter=False))
+        jitt_xor.append(json_udp_loss(path, jitter=True))
+    
+    # Compute ratio
+    loss_rlc_xor = [i / j for i, j in zip(loss_rlc, loss_xor)]
+    print(np.mean(loss_rlc_xor))
+    jitt_rlc_xor = [i / j for i, j in zip(jitt_rlc, jitt_xor)]
+
+    for ki, k in enumerate([99, 96, 93, 90]):
+        for di, d in enumerate(np.arange(0, 51, 2)):
+            i = ki * 26 + di
+            print(k, d, ":", loss_xor[i], loss_rlc[i], "==", loss_rlc_xor[i])
+    
+    fig, ax = plt.subplots()
+    ax.grid()
+    ax.set_axisbelow(True)
+
+    max_val = max(max(loss_rlc_xor), max(jitt_rlc_xor))
+    min_val = min(min(loss_rlc_xor), min(jitt_rlc_xor))
+    hist_loss, bin_edges_loss = np.histogram(loss_rlc_xor, bins=60, range=(0.95, 1.2), density=True)
+    hist_jitt, bin_edges_jitt = np.histogram(jitt_rlc_xor, bins=60, range=(0, 2), density=True)
+    dx = bin_edges_loss[1] - bin_edges_loss[0]
+    cdf_loss = np.cumsum(hist_loss) * dx
+    cdf_jitt = np.cumsum(hist_jitt) * dx
+
+    # Dummy values
+    cdf_loss = np.insert(cdf_loss, 0, 0)
+    cdf_jitt = np.insert(cdf_jitt, 0, 0)
+    bin_edges_loss = [0] + bin_edges_loss
+    bin_edges_jitt = [0] + bin_edges_jitt
+
+    ax.plot(bin_edges_loss, cdf_loss, label="RLC/XOR", color="darkblue", linestyle="-")
+    # ax.plot(bin_edges_jitt, cdf_jitt, label="jitter", color="green", linestyle="-.")
+
+    ax.set_xlabel("Ratio RLC/XOR")
+    ax.set_ylabel("CDF")
+    plt.legend(loc="best")
+    plt.savefig("figures/exp_udp_vs_loss_cdf.svg")
+    plt.show()
+
+
 if __name__ == "__main__":
     # plugin_overhead()
     # analyze_tpc_congestion_window_all(scrap_cw, boxplot=True)
     # analyze_udp_loss(cdf=True, boxplot=True)
-    analyze_tcp_quality()
+    # analyze_tcp_quality()
+    # analyze_retransmission()
+    # analyze_udp_traffic(cdf=True, jitter=False)
+    rlc_vs_udp()

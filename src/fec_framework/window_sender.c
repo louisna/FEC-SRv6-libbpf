@@ -94,11 +94,11 @@ static __always_inline int fecFramework__convolution(struct __sk_buff *skb, void
     /* A repair symbol must be generated
      * Forward all data to user space for computation for now as we cannot perform that is the kernel
      * due to the current limitations */
-    if (ret) {
+    if (ret ){//&& (fecConvolution->controller_repair & 0x1)) {
         for_user_space_t *to_user_space = (for_user_space_t *)fecConvolution;
         //bpf_printk("Send data to user space with encodingSymbolID: %u\n", to_user_space->encodingSymbolID);
         bpf_perf_event_output(skb, map, BPF_F_CURRENT_CPU, fecConvolution, sizeof(for_user_space_t));
-    } else {
+    } else if (!ret) {
         fecConvolution->ringBuffSize = ringBuffSize; // The value is updated by the FEC Scheme if we generate repair symbols
     }
 

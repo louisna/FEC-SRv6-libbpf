@@ -4,7 +4,7 @@
 #include "../decoder.h"
 
 #define MIN(a, b) ((a < b) ? a : b)
-#define MAX_WINDOW_CHECK 3
+#define MAX_WINDOW_CHECK 5
 #define LOOP for(int ____i = 0; ____i < 1000; ____i++) {}
 
 void print_recovered(recoveredSource_t *recoveredPacket) {
@@ -384,6 +384,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
             recoveredSource_t *recovered = malloc(sizeof(recoveredSource_t));
             memset(recovered, 0, sizeof(recoveredSource_t));
             recovered->encodingSymbolID = id_first_ss_first_window + idx;
+            // printf("Recovered packet with encodingSymbolID=%u\n", recovered->encodingSymbolID);
             memcpy(recovered->packet, unknowns[current_unknown], MAX_PACKET_SIZE);
             memcpy(&recovered->packet_length, unknowns[current_unknown] + MAX_PACKET_SIZE, sizeof(uint16_t));
             //printf("Recovered packet from %u to %u\n", unknowns[current_unknown] + MAX_PACKET_SIZE, recovered->packet_length);

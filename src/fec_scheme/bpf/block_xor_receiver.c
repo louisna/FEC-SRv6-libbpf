@@ -11,8 +11,7 @@
 #include "../../libseg6.c"
 #include "../../decoder.h"
 
-static __always_inline int can_decode_xor(xorStruct_t *xorStruct) {
-    struct sourceBlock_t *sourceBlock = &(xorStruct->sourceBlocks);
+static __always_inline int can_decode_xor(struct sourceBlock_t *sourceBlock) {
 
     /* Still not received the repair symbol */
     if (!sourceBlock->receivedRepair) {
@@ -35,7 +34,7 @@ static __always_inline int can_decode_xor(xorStruct_t *xorStruct) {
     }
 
     /* At this point, we know we can send a recovered packet */
-    if (DEBUG) bpf_printk("Receiver: can recover from a lost packet\n");
+    //bpf_printk("Receiver: can recover from a lost packet\n");
     return 1;
 
 }

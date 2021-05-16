@@ -27,6 +27,7 @@ enum fec_framework {
 };
 
 typedef struct {
+    char encoder_ip[48];
     char decoder_ip[48];
     enum fec_framework framework;
     bool attach;
@@ -38,7 +39,10 @@ static volatile int exiting = 0;
 
 static volatile int sfd = -1;
 
+static volatile int map_fd_fecConvolutionBuffer;
+
 static struct sockaddr_in6 local_addr;
+static struct sockaddr_in6 encoder;
 
 decode_rlc_t *rlc = NULL;
 
@@ -65,15 +69,19 @@ static void bump_memlock_rlimit(void)
     }
 }
 
+int globalCount = 0;
+
 static void send_recovered_symbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz) {
     /* Get the repairSymbol
      * ->packet: the decoded and recovered packet
      * ->packet_length: the length of the recovered packet
      */
     const struct repairSymbol_t *repairSymbol = (struct repairSymbol_t *)data;
-    printf("CALL TRIGGERED!\n");
 
-    send_raw_socket(sfd, repairSymbol, local_addr);
+    ++globalCount;
+    if (globalCount % 1000 == 0) printf("CALL TRIGGERED!\n");
+
+    send_raw_socket_recovered(sfd, repairSymbol, local_addr);
 }
 
 /*static void debug_print(fecConvolution_t *fecConvolution) {
@@ -82,9 +90,51 @@ static void send_recovered_symbol_XOR(void *ctx, int cpu, void *data, __u32 data
     }
 }*/
 
-int globalCount = 0;
+static void controller() {
+    int k = 0;
+    int err;
+    fecConvolution_t fecConvolution;
+
+    err = bpf_map_lookup_elem(map_fd_fecConvolutionBuffer, &k, &fecConvolution);
+    if (err < 0) {
+        fprintf(stderr, "Error while taking the fecConvolution from userspace for controller\n");
+        return;
+    }
+
+    uint8_t total_source_symbols_in_buffer = 0;
+    struct tlvSource__convo_t *tlv;
+    uint8_t idx;
+    for (k = 0; k < RLC_RECEIVER_BUFFER_SIZE; ++k) {
+        idx = (fecConvolution.encodingSymbolID - k) % RLC_RECEIVER_BUFFER_SIZE;
+        tlv = (struct tlvSource__convo_t *)&fecConvolution.sourceRingBuffer[idx].tlv;
+        if (tlv->encodingSymbolID == (fecConvolution.encodingSymbolID - k)) {
+            ++total_source_symbols_in_buffer;
+        }
+    }
+
+    uint8_t msg = 0;
+
+    // Decision function
+    if (RLC_RECEIVER_BUFFER_SIZE - total_source_symbols_in_buffer > 1) {
+        printf("Received: %u\n", total_source_symbols_in_buffer);
+        msg = 1;
+    }
+
+    printf("Send control message with message: %u\n", msg);
+    err = send_raw_socket_controller(sfd, local_addr, encoder, msg);
+    if (err < 0) {
+        fprintf(stderr, "Error while sending the control message\n");
+    }
+}
 
 static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
+    uint8_t *controller_message = (uint8_t *)data;
+    if ((*controller_message) & 0x4) {
+        // This is a controller message
+        controller();
+        return;
+    }
+    // This is a recovering information
     fecConvolution_t *fecConvolution = (fecConvolution_t *)data;
     //printf("Call triggered: %d\n", fecConvolution->encodingSymbolID);
 
@@ -133,8 +183,6 @@ static void handle_events(int map_fd_events, enum fec_framework framework) {
         }
     }
 
-    printf("Sort ici\n");
-
 cleanup:
     perf_buffer__free(pb);
 }
@@ -143,6 +191,7 @@ void usage(char *prog_name) {
     fprintf(stderr, "USAGE:\n");
     fprintf(stderr, "    %s [-f framework] [-d decoder ipv6]\n", prog_name);
     fprintf(stderr, "    -f framework (default: convo): FEC Framework to use [convo, block]\n");
+    fprintf(stderr, "    -e encoder_ip (default: fc00::a): IPv6 of the encoder router\n");
     fprintf(stderr, "    -d decoder_ip (default: fc00::9): IPv6 of the decoder router\n");
     fprintf(stderr, "    -a attach: if set, attempts to attach the program to *encoder_ip*\n");
     fprintf(stderr, "    -i interface: the interface to which attach the program (if *attach* is set)\n");
@@ -152,13 +201,14 @@ int parse_args(args_t *args, int argc, char *argv[]) {
     memset(args, 0, sizeof(args_t));
     // Default values
     strcpy(args->decoder_ip, "fc00::9");
+    strcpy(args->encoder_ip, "fc00::a");
     args->framework = CONVO;
     args->attach = false;
 
     bool interface_if_attach = false;
 
     int opt;
-    while ((opt = getopt(argc, argv, "f:d:ai:")) != -1) {
+    while ((opt = getopt(argc, argv, "f:d:e:ai:")) != -1) {
         switch (opt) {
             case 'f':
                 if (strncmp(optarg, "block", 6) == 0) {
@@ -176,6 +226,13 @@ int parse_args(args_t *args, int argc, char *argv[]) {
                     return -1;
                 }
                 strncpy(args->decoder_ip, optarg, 48);
+                break;
+            case 'e':
+                if (strlen(optarg) > 48) {
+                    fprintf(stderr, "Wrong decoder IPv6 address: %s\n", optarg);
+                    return -1;
+                }
+                strncpy(args->encoder_ip, optarg, 48);
                 break;
             case 'a':
                 args->attach = true;
@@ -216,8 +273,15 @@ int main(int argc, char **argv)
     /* Init the address structure for current node */
     memset(&local_addr, 0, sizeof(local_addr));
     local_addr.sin6_family = AF_INET6;
-    // TODO: now it is hardcoded
     if (inet_pton(AF_INET6, plugin_arguments.decoder_ip, local_addr.sin6_addr.s6_addr) != 1) {
+        perror("inet ntop src");
+        return -1;
+    }
+
+    /* Init the address structure for encoder */
+    memset(&encoder, 0, sizeof(encoder));
+    encoder.sin6_family = AF_INET6;
+    if (inet_pton(AF_INET6, plugin_arguments.encoder_ip, encoder.sin6_addr.s6_addr) != 1) {
         perror("inet ntop src");
         return -1;
     }
@@ -271,8 +335,11 @@ int main(int argc, char **argv)
 
     int k0 = 0;
     struct bpf_map *map_fecConvolutionBuffer = skel->maps.fecConvolutionInfoMap;
-    int map_fd_fecConvolutionBuffer = bpf_map__fd(map_fecConvolutionBuffer);
-    fecConvolution_t convo_struct_zero = {};
+    map_fd_fecConvolutionBuffer = bpf_map__fd(map_fecConvolutionBuffer);
+    fecConvolution_t convo_struct_zero = {
+        .controller_repair = (5 << 4) + (1 << 1),
+    };
+    printf("Value of controller repair: %u\n", convo_struct_zero.controller_repair);
     bpf_map_update_elem(map_fd_fecConvolutionBuffer, &k0, &convo_struct_zero, BPF_ANY);
 
     struct bpf_map *map_events = skel->maps.events;

@@ -20,8 +20,8 @@ struct {
     __type(value, xorStruct_t);
 } xorBuffer SEC(".maps");
 
-static __always_inline int can_decode(xorStruct_t *xorStruct) {
-    return can_decode_xor(xorStruct);
+static __always_inline int can_decode(struct sourceBlock_t *sourceBlock) {
+    return can_decode_xor(sourceBlock);
 }
 
 static __always_inline int receiveSourceSymbol__block(struct __sk_buff *skb, struct ip6_srh_t *srh, int tlv_offset, void *map) {
@@ -106,7 +106,7 @@ static __always_inline int receiveSourceSymbol__block(struct __sk_buff *skb, str
     }
 
     /* Detect if we can recover a lost symbol */
-    err = can_decode(xorStruct);
+    err = can_decode(sourceBlock);
 
     /* A source symbol is recovered, transmit it to user space */
     if (err == 1) {
@@ -190,7 +190,7 @@ static __always_inline int receiveRepairSymbol__block(struct __sk_buff *skb, str
     }
 
     /* Detect if we can recover a lost symbol */
-    err = can_decode(xorStruct);
+    err = can_decode(sourceBlock);
 
     /* A source symbol is recovered, transmit it to user space */
     if (err == 1) {

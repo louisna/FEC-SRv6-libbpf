@@ -74,7 +74,6 @@ static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz)
     if (total % 10000 == 0) printf("CALL TRIGGERED!\n");
     //printf("Repair symbol of length: %u\n", repairSymbol->packet_length);
     //printf("Information sur mon repair symbol: %u %u\n", repairSymbol->packet_length, repairSymbol->tlv[0]);
-
     ++total;
     send_raw_socket(sfd, repairSymbol, src, dst);
 }
@@ -310,6 +309,7 @@ int main(int argc, char *argv[]) {
     fecConvolution_t convo_init = {0};
     convo_init.currentWindowSize = plugin_arguments.window_size;
     convo_init.currentWindowSlide = plugin_arguments.window_slide;
+    convo_init.controller_repair = 3;
     bpf_map_update_elem(map_fd_fecConvolutionBuffer, &k0, &convo_init, BPF_ANY);
 
     struct bpf_map *map_events = skel->maps.events;

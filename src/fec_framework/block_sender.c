@@ -55,15 +55,11 @@ static __always_inline int fecFramework__block(struct __sk_buff *skb, void *csh_
     csh->sourceSymbolNb = sourceSymbolCount;
 
     if (sourceSymbolCount == mapStruct->currentBlockSize - 1) {
-        ++sourceBlock; // Next packet will belong to another source block
-        sourceSymbolCount = 0;
+        ++mapStruct->soubleBlock; // Next packet will belong to another source block
+        mapStruct->sourceSymbolCount = 0;
     } else {
-        ++sourceSymbolCount;
+        ++mapStruct->sourceSymbolCount;
     }
-
-    /* Update with new values */
-    mapStruct->soubleBlock = sourceBlock;
-    mapStruct->sourceSymbolCount = sourceSymbolCount;
 
     bpf_spin_unlock(&mapStruct->lock);
 

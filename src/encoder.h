@@ -40,6 +40,7 @@ typedef struct fecConvolution {
     __u8 currentWindowSize;
     __u8 currentWindowSlide;
     struct bpf_spin_lock lock;
+    __u8 controller_repair;
 } fecConvolution_t;
 
 typedef struct {

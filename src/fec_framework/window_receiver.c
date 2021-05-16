@@ -99,6 +99,16 @@ static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *sk
     if (0) {
         bpf_perf_event_output(skb, map, BPF_F_CURRENT_CPU, fecConvolution, sizeof(fecConvolution_t));
     }
+
+    /* Call the controller program */
+    /*if ((fecConvolution->controller_repair & 0x2)  && encodingSymbolID % (300) == 0) {
+        // Just send a __u8 to indicate the changes
+        // 4 => controller message
+        // 2 => controller enabled
+        __u8 controller_message = 6;
+        bpf_perf_event_output(skb, map, BPF_F_CURRENT_CPU, &controller_message, sizeof(__u8));
+    }*/
+
     return 0; //try_to_recover__convoRLC(skb, fecConvolution);
 }
 

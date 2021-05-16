@@ -278,7 +278,7 @@ static __always_inline int seg6_delete_tlv2(struct __sk_buff *skb, struct ip6_sr
 	return __update_tlv_pad(skb, new_pad, pad_size, pad_off);
 }
 
-static __always_inline int seg6_find_tlv2(struct __sk_buff *skb, struct ip6_srh_t *srh, int *tlv_type, __u8 source_tlv_length, __u8 repair_tlv_length)
+static __always_inline int seg6_find_tlv2(struct __sk_buff *skb, struct ip6_srh_t *srh, __u8 *tlv_type, __u8 source_tlv_length, __u8 repair_tlv_length)
 		  // TODO: replace all args by structure for typeX, lenX
 {
 	int srh_offset = (char *)srh - (char *)(long)skb->data;
@@ -286,7 +286,6 @@ static __always_inline int seg6_find_tlv2(struct __sk_buff *skb, struct ip6_srh_
 	int cursor = srh_offset + sizeof(struct ip6_srh_t) +
 		((srh->first_segment + 1) << 4);
 
-	int test;
 	#pragma clang loop unroll(full)
 	for(int i=0; i < TLV_ITERATIONS; i++) {
 		if (cursor >= srh_offset + ((srh->hdrlen + 1) << 3))
@@ -296,8 +295,6 @@ static __always_inline int seg6_find_tlv2(struct __sk_buff *skb, struct ip6_srh_
 		if (bpf_skb_load_bytes(skb, cursor, &tlv, sizeof(struct sr6_tlv_t)))
 			return -1;
 		//bpf_trace_printk("TLV type=%d len=%d found at offset %d\n", tlv.type, tlv.len, cursor);
-		if (tlv.type == 24)
-			test = tlv.len + sizeof(struct sr6_tlv_t);
 		if ((tlv.type == 156 && tlv.len + sizeof(struct sr6_tlv_t) == source_tlv_length) ||
 			(tlv.type == 157 && tlv.len + sizeof(struct sr6_tlv_t) == repair_tlv_length)) {
 			*tlv_type = tlv.type;

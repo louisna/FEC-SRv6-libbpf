@@ -187,19 +187,18 @@ def exchanged_bytes(cdf=False, boxplot=True):
     
     # Now separate in subtabs
     data_without_by_k = []
-    i = 0
     for k in range(4):
         by_d = []
-        for d in range(26):
+        for d in range(25):
+            i = k * 26 + d
             by_d.append(data_without[i])
-            i += 1
         data_without_by_k.append(by_d)
     
     data_rlc_by_k = []
-    i = 0
     for k in range(4):
         by_d = []
-        for d in range(26):
+        for d in range(25):
+            i = k * 26 + d
             by_d.append(data_rlc[i])
             i += 1
         data_rlc_by_k.append(by_d)
@@ -246,6 +245,7 @@ def exchanged_bytes(cdf=False, boxplot=True):
         if not cdf:
             to_plot = np.array([99, 95, 93, 90])
             tp = [99, 95, 93, 90]
+            idx_d = np.arange(0, 50, 2)
             tp_str = ["k=" + str(i) for i in tp]
             linestyles = ["-", "--", "-.", ":"]
             # Exists also: linestyle=(0, (5, 2, 1, 2))
@@ -257,10 +257,10 @@ def exchanged_bytes(cdf=False, boxplot=True):
             print(without_normalized)
             
             for idx, i in enumerate(range(4)):
-                p, = ax.plot(without_normalized[i], color=colors_without[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
+                p, = ax.plot(idx_d, without_normalized[i], color=colors_without[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
                 p_without.append(p)
             for idx, i in enumerate(range(4)):
-                p, = ax.plot(rlc_normalized[i], color=colors_rlc[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
+                p, = ax.plot(idx_d, rlc_normalized[i], color=colors_rlc[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
                 p_rlc.append(p)
             
             # Dummy plots
@@ -271,7 +271,7 @@ def exchanged_bytes(cdf=False, boxplot=True):
             ax.set_ylabel("Data sent [kB]")
             leg3 = plt.legend([p5] + p_without + [p5] + p_rlc,
                     ["TCP"] + tp_str + ["RLC"] + tp_str,
-                    loc=2, ncol=2) # Two columns, vertical group labels
+                    loc="best", ncol=2) # Two columns, vertical group labels
 
             ax.grid()
             ax.set_axisbelow(True)
@@ -369,27 +369,24 @@ def analyze_point_plot_idx(boxplot):
     
     baseline = scrap_mqtt_json_multiple_run("results_without_2500/mqtt_res_run_10_-1.json")
     
-    idx = 0
     res_by_k = []
     for k in range(4):
         res_by_d = []
-        for d in range(26):
+        for d in range(25):
+            idx = k * 26 + d
             filename = sorted_filenames_without[idx]
             path = os.path.join("results_without_2500", filename)
             res_by_d.append(scrap_mqtt_json_multiple_run(path))
-            idx += 1
         res_by_k.append(res_by_d)
     
-
-    idx = 0
     res_by_k_rlc = []
     for k in range(4):
         res_by_d = []
-        for d in range(26):
+        for d in range(25):
+            idx = k * 26 + d
             filename = sorted_filenames_with[idx]
             path = os.path.join("results_rlc_2500", filename)
             res_by_d.append(scrap_mqtt_json_multiple_run(path))
-            idx += 1
         res_by_k_rlc.append(res_by_d)
     
     if boxplot:
@@ -425,6 +422,7 @@ def analyze_point_plot_idx(boxplot):
         plt.show()
     else:
         to_plot = np.array([99, 95, 93, 90])
+        idx_d = np.arange(0, 50, 2)
         tp = [99, 95, 93, 90]
         tp_str = ["k=" + str(i) for i in tp]
         linestyles = ["-", "--", "-.", ":"]
@@ -438,13 +436,13 @@ def analyze_point_plot_idx(boxplot):
         p_without = []
         p_rlc = []
 
-        ax.plot([0, 10], [baseline] * 2, color="black", linestyle=":", label="Baseline TCP", linewidth=3)
+        ax.plot([0, 49], [baseline] * 2, color="black", linestyle=":", label="Baseline TCP", linewidth=3)
 
         for idx, i in enumerate(range(4)):
-            p, = ax.plot(res_by_k[i], color=colors_without[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
+            p, = ax.plot(idx_d, res_by_k[i], color=colors_without[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
             p_without.append(p)
         for idx, i in enumerate(range(4)):
-            p, = ax.plot(res_by_k_rlc[i], color=colors_rlc[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
+            p, = ax.plot(idx_d, res_by_k_rlc[i], color=colors_rlc[idx], label=f"k={to_plot[idx]}", linestyle=linestyles[idx])
             p_rlc.append(p)
             pass
         
@@ -457,7 +455,7 @@ def analyze_point_plot_idx(boxplot):
         # plt.legend(ncol=2,handleheight=2.4, labelspacing=0.05)
         leg3 = plt.legend([p5] + p_without + [p5] + p_rlc,
                 ["TCP"] + tp_str + ["RLC"] + tp_str,
-                loc=2, ncol=2) # Two columns, vertical group labels
+                loc="best", ncol=2) # Two columns, vertical group labels
 
         plt.ylim((20, 60))
         # plt.title("Mean latency to send a MQTT message to the broker\nDepending on k and d from the Markov loss model")
@@ -468,8 +466,8 @@ def analyze_point_plot_idx(boxplot):
 
 
 def analyze_latency():
-    _, _, filenames_without = next(os.walk("results_without_10/"))
-    _, _, filenames_with = next(os.walk("results_rlc_3/"))
+    _, _, filenames_without = next(os.walk("results_without_2500/"))
+    _, _, filenames_with = next(os.walk("results_rlc_2500/"))
     # print(filenames_without)
 
     res_without = list()
@@ -477,13 +475,13 @@ def analyze_latency():
 
     # I forgot to use JSON format so I need to scrapt like a n00b
     for filename in tqdm(sorted(filenames_without)):
-        path = os.path.join("results_without_10", filename)
-        res_without.append(read_mqtt_run_json(path))
+        path = os.path.join("results_without_2500", filename)
+        res_without.append(scrap_mqtt_json_multiple_run(path))
 
     # The same but for RLC
     for filename in tqdm(filenames_with):
-        path = os.path.join("results_rlc_3", filename)
-        res_rlc.append(read_mqtt_run_json(path))
+        path = os.path.join("results_rlc_2500", filename)
+        res_rlc.append(scrap_mqtt_json_multiple_run(path))
     
     print([int(i) for i in res_without if i > 50])
 
@@ -518,6 +516,6 @@ if __name__ == "__main__":
     # analyze_latency()
     # analyze_point_plot_same_K(90)
     # analyze_point_plot_same_D(2)
-    analyze_point_plot_idx(boxplot=False)
-    # exchanged_bytes(boxplot=False)
+    # analyze_point_plot_idx(boxplot=False)
+    exchanged_bytes(boxplot=False, cdf=True)
     # loss_varying_delay(True)

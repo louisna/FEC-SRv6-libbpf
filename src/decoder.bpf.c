@@ -41,7 +41,7 @@ int decode_convo(struct __sk_buff *skb) {
     }
 
     /* Get the TLV from the SRH */
-    int tlv_type = 0; // Know whether the packet is a source or a repair symbol
+    __u8 tlv_type = 0; // Know whether the packet is a source or a repair symbol
     long cursor = seg6_find_tlv2(skb, srh, &tlv_type, sizeof(struct tlvSource__block_t), sizeof(struct tlvRepair__block_t));
     if (cursor < 0) {
         if (DEBUG) bpf_printk("Receiver: impossible to get the TLV\n");
@@ -96,7 +96,7 @@ int decode_block(struct __sk_buff *skb) {
     }
 
     /* Get the TLV from the SRH */
-    int tlv_type = 0; // Know whether the packet is a source or a repair symbol
+    __u8 tlv_type = 0; // Know whether the packet is a source or a repair symbol
     long cursor = seg6_find_tlv2(skb, srh, &tlv_type, sizeof(struct tlvSource__block_t), sizeof(struct tlvRepair__block_t));
     if (cursor < 0) {
         if (DEBUG) bpf_printk("Receiver: impossible to get the TLV\n");

@@ -66,4 +66,13 @@ struct tlvRepair__convo_t {
     __u8 nrs;
 } BPF_PACKET_HEADER;
 
+/* Controller */
+typedef struct {
+    __u8 tlv_type;
+    __u8 len;
+    __u8 controller_repair;
+    __u8 padding1;
+    __u32 padding4;
+} tlv_controller_t;
+
 #endif

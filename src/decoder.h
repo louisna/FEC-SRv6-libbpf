@@ -45,6 +45,7 @@ typedef struct {
 } window_info_t;
 
 typedef struct {
+    __u16 controller_repair;
     __u32 encodingSymbolID; // Of the current repair symbol
     __u16 repairKey;
     __u8 ringBuffSize; // Number of packets for next coding in the ring buffer
@@ -53,9 +54,9 @@ typedef struct {
 } fecConvolution_t;
 
 typedef struct {
-    __u32 encodingSymbolID;
-    __u16 packet_length;
     __u8 packet[MAX_PACKET_SIZE];
+    __u16 packet_length;
+    __u32 encodingSymbolID;
 } recoveredSource_t;
 
 typedef struct {

@@ -59,11 +59,11 @@ scapy_args = Crafting(verbose=False, source="2042:aa::1", destination="fc00::9",
 for i in range(1):
     output_dir = output_dir_template()
     f"echo [ >> {output_dir}"
-    command = f"{mqtt_bench_template} >> {output_dir}"
+    command = f"{mqtt_bench_template} "#>> {output_dir}"
     for i in range(3):  # repeat each experiment 3 times
         os.system(command)
-        f"echo , >> {output_dir}"
-    f"echo ] >> {output_dir}"
+        #f"echo , >> {output_dir}"
+    #f"echo ] >> {output_dir}"
 
     # Notify the dropper that we can update the parameters for the next state
     pkt = craft_srv6_packet(scapy_args, "zzzzzzzzzzz")
