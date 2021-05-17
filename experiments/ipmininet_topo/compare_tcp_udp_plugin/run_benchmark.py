@@ -66,26 +66,26 @@ signal.signal(signal.SIGINT, signal_handler)
 print('Press Ctrl+C')
 if args.tcp_quality == 0:
     transport_cmd = "--udp -l 280" if args.udp else "-M 280"
-    output_dir_template = lambda: f" >> {args.output}/mqtt_res_run_10_{i}.json"
+    output_dir_template = lambda: f" >> {args.output}"
     bench_template = f"iperf3 -c 2042:dd::1 -t {args.t} {transport_cmd} --json"
     print(bench_template)
     scapy_args = Crafting(verbose=False, source="2042:aa::1", destination=update_destination, port=3333)
 
-    for i in range(104):
+    for i in range(1):
         print(i)
         output_dir = "" if args.output is None else output_dir_template()
-        os.system(f"echo [ {output_dir}")
+        #os.system(f"echo [ {output_dir}")
         command = f"{bench_template} {output_dir}"
-        for i in range(3):
+        for i in range(1):
             os.system(command)
             if i < 2:
+                #os.system(f"echo , {output_dir}")
                 pass
-                os.system(f"echo , {output_dir}")
-        os.system(f"echo ] {output_dir}")
+        #os.system(f"echo ] {output_dir}")
 
         # Notify the dropper that we can update the parameters for the next state
         pkt = craft_srv6_packet(scapy_args, "zzzzzzzzzzz")
-        send(pkt)
+        #send(pkt)
         print("Sent update packet !")
         time.sleep(0.1)
 else:

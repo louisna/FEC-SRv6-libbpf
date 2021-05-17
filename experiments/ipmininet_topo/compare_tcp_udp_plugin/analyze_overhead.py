@@ -1,12 +1,14 @@
 #!/bin/python3
 
 import matplotlib.pyplot as plt
+from pandas.io.pytables import DataCol
 import numpy as np
 import seaborn as sns
 import os
 import json
 import yaml
 from tqdm import tqdm
+import pandas as pd
 
 
 def sort_list_by_idx(filename):
@@ -743,6 +745,45 @@ def rlc_vs_udp():
     plt.show()
 
 
+def analyze_controller():
+    file_without = "results_17_05/udp_without_95_30_rlc_std_1s.csv"
+    file_control = "results_17_05/udp_controller_95_30_rlc_std_1s.csv"  # Oops it is in ms and not seconds
+
+    data_without = pd.read_csv(file_without).values
+    data_control = pd.read_csv(file_control).values
+
+    idx_without = [i[0] for i in data_without]
+    idx_control = [i[0] for i in data_control]
+
+    val_without = [i[1] for i in data_without]
+    val_control = [i[1] for i in data_control]
+
+    # Must transform from 100ms to 1 sec oops => just for this run 
+    val_control_sec = []
+    idx_control_sec = []
+    i = 0
+    while i < len(val_control):
+        val = 0
+        idx = idx_control[i]
+        for j in range(10):
+            if i >= len(val_control): break
+            val += val_control[i]
+            i += 1
+        val_control_sec.append(val)
+        idx_control_sec.append(idx)
+    
+    # Replace oops
+    val_control = val_control_sec
+    idx_control = idx_control_sec
+
+    fig, ax = plt.subplots()
+    ax.plot(idx_without, val_without)
+    ax.plot(idx_control, val_control)
+    plt.ylim((170000, 350000))
+    plt.show()
+    
+
+
 if __name__ == "__main__":
     # plugin_overhead()
     # analyze_tpc_congestion_window_all(scrap_cw, boxplot=True)
@@ -750,4 +791,5 @@ if __name__ == "__main__":
     # analyze_tcp_quality()
     # analyze_retransmission()
     # analyze_udp_traffic(cdf=True, jitter=False)
-    rlc_vs_udp()
+    # rlc_vs_udp()
+    analyze_controller()

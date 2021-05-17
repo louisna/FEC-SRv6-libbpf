@@ -69,6 +69,14 @@ def rewrite_json(filename):
         content = fd.read()
         fd.seek(0, 0)
         fd.write("[\n" + content + "]")
+    
+
+def json_multiple_run_mtm(filename):
+    with open(filename, "r") as fd:
+        data = json.load(fd)
+    
+    res_by_run = [run["totals"]["msg_time_mean_avg"] for run in data]
+    return np.median(res_by_run)
 
 
 def read_mqtt_run_json_all(filename):
@@ -511,11 +519,47 @@ def analyze_latency():
     plt.show()
 
 
+def sort_list_by_idx(filename):
+    nb = filename.split("_")[-1].split(".")[0]
+    return int(nb)
+
+
+def varying_latency():
+    _, _, filenames_without = next(os.walk("delay/without/"))
+    _, _, filenames_rlc = next(os.walk("delay/rlc/"))
+
+    sorted_filenames_rlc = sorted(filenames_without, key=sort_list_by_idx)
+    sorted_filenames_xor = sorted(filenames_rlc, key=sort_list_by_idx)
+
+    res_without = list()
+    res_rlc = list()
+
+    # I forgot to use JSON format so I need to scrapt like a n00b
+    for filename in tqdm(sorted_filenames_rlc):
+        path = os.path.join("delay/without", filename)
+        res_without.append(json_multiple_run_mtm(path))
+
+    # The same but for RLC
+    for filename in tqdm(sorted_filenames_xor):
+        path = os.path.join("delay/rlc", filename)
+        res_rlc.append(json_multiple_run_mtm(path))
+    
+    fig, ax = plt.subplots()
+
+    idx_delay = np.arange(5, 101, 5)
+
+    ax.plot(idx_delay, res_without, label="TCP")
+    ax.plot(idx_delay, res_rlc, label="RLC")
+    ax.plot(idx_delay, np.array(res_without) - np.array(res_rlc), label="Difference")
+    plt.legend()
+    plt.show()
+
 
 if __name__ == "__main__":
     # analyze_latency()
+    varying_latency()
     # analyze_point_plot_same_K(90)
     # analyze_point_plot_same_D(2)
     # analyze_point_plot_idx(boxplot=False)
-    exchanged_bytes(boxplot=False, cdf=True)
+    # exchanged_bytes(boxplot=False, cdf=True)
     # loss_varying_delay(True)
