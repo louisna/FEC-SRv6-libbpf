@@ -70,6 +70,9 @@ static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *sk
         return -1;
     }
 
+    // Complete the reserved structure of the controller
+    fecConvolution->receivedEncodingSymbolID[ringBufferIndex & (RLC_RECEIVER_BUFFER_SIZE - 1)] = encodingSymbolID;
+
     /* Store source symbol */
     err = storePacket_decode(skb, sourceSymbol);
     if (err < 0) {
@@ -100,14 +103,29 @@ static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *sk
         bpf_perf_event_output(skb, map, BPF_F_CURRENT_CPU, fecConvolution, sizeof(fecConvolution_t));
     }
 
-    /* Call the controller program */
-    /*if ((fecConvolution->controller_repair & 0x2)  && encodingSymbolID % (300) == 0) {
-        // Just send a __u8 to indicate the changes
-        // 4 => controller message
-        // 2 => controller enabled
-        __u8 controller_message = 6;
-        bpf_perf_event_output(skb, map, BPF_F_CURRENT_CPU, &controller_message, sizeof(__u8));
-    }*/
+    /* Call the controller program every 32 received source symbols 
+     * First condition: the controller is enabled
+     * Second condition: received 32 source symbols after last update 
+     *      recall: the number of received source symbols since last update is
+     *      stored in the highest order byte of controller_repair */
+    if (fecConvolution->controller_repair & 0x2) {
+        // First increment the counter
+        fecConvolution->controller_repair += (1 << 8);
+
+        if ((fecConvolution->controller_repair >> 8) >= RLC_RECEIVER_BUFFER_SIZE) {
+            fecConvolution->encodingSymbolID = encodingSymbolID;
+            
+            // Update message for the userspace and reset counter
+            fecConvolution->controller_repair = 6;
+
+            // Get lightweight structure for the perf output
+            controller_t *controller_info = (controller_t *)fecConvolution;
+            bpf_perf_event_output(skb, map, BPF_F_CURRENT_CPU, controller_info, sizeof(controller_t));
+            
+            // Reset the value of the message
+            fecConvolution->controller_repair = 2;
+        }
+    }
 
     return 0; //try_to_recover__convoRLC(skb, fecConvolution);
 }

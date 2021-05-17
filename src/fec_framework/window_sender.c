@@ -47,6 +47,7 @@ static __always_inline int fecFramework__convolution(struct __sk_buff *skb, void
     __u8 ringBuffSize = fecConvolution->ringBuffSize;
     __u8 windowSize = fecConvolution->currentWindowSize;
     fecConvolution->encodingSymbolID = encodingSymbolID + 1;
+    // TODO: maybe do the check to update the ring buff size directly here
     bpf_spin_unlock(&fecConvolution->lock);
 
     __u8 DT = 15; // TODO find good value
@@ -94,11 +95,14 @@ static __always_inline int fecFramework__convolution(struct __sk_buff *skb, void
     /* A repair symbol must be generated
      * Forward all data to user space for computation for now as we cannot perform that is the kernel
      * due to the current limitations */
-    if (ret ){//&& (fecConvolution->controller_repair & 0x1)) {
+    //bpf_printk("Rentre ici wtf\n");
+    if (ret && (fecConvolution->controller_repair & 0x1)) {
         for_user_space_t *to_user_space = (for_user_space_t *)fecConvolution;
+        //bpf_printk("Parfois faut aussi envoyer des paquets\n");
         //bpf_printk("Send data to user space with encodingSymbolID: %u\n", to_user_space->encodingSymbolID);
         bpf_perf_event_output(skb, map, BPF_F_CURRENT_CPU, fecConvolution, sizeof(for_user_space_t));
     } else if (!ret) {
+        //bpf_printk("Hooo yeeaaaaah\n");
         fecConvolution->ringBuffSize = ringBuffSize; // The value is updated by the FEC Scheme if we generate repair symbols
     }
 

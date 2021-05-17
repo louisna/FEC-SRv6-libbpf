@@ -47,6 +47,7 @@ typedef struct {
 typedef struct {
     __u16 controller_repair;
     __u32 encodingSymbolID; // Of the current repair symbol
+    __u32 receivedEncodingSymbolID[RLC_RECEIVER_BUFFER_SIZE]; // encodingSymbolID received (redundant but faster !)
     __u16 repairKey;
     __u8 ringBuffSize; // Number of packets for next coding in the ring buffer
     struct sourceSymbol_t sourceRingBuffer[RLC_RECEIVER_BUFFER_SIZE];
@@ -64,5 +65,11 @@ typedef struct {
     __u8 *table_inv;
     recoveredSource_t *recoveredSources[RLC_RECEIVER_BUFFER_SIZE];
 } decode_rlc_t;
+
+typedef struct {
+    __u16 controller_repair;
+    __u32 encodingSymbolID;
+    __u32 receivedEncodingSymbolId[RLC_RECEIVER_BUFFER_SIZE];
+} controller_t;
 
 #endif

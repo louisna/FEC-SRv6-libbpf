@@ -12,7 +12,6 @@
 #include "decoder.skel.h"
 #include <bpf/bpf.h>
 #include "decoder.h"
-// #include "fec/fec.c"
 #include "raw_socket_receiver.c"
 #include "fec_scheme/window_rlc_gf256/rlc_gf256_decode.c"
 #include <arpa/inet.h>
@@ -90,40 +89,52 @@ static void send_recovered_symbol_XOR(void *ctx, int cpu, void *data, __u32 data
     }
 }*/
 
-static void controller() {
+uint16_t controller_theoric_counter = 0;
+uint16_t controller_received_counter = 0;
+uint16_t controller_update_every = 1000;
+uint8_t controller_threshold = 98; // Percentage
+
+
+static void controller(void *data) {
     int k = 0;
     int err;
-    fecConvolution_t fecConvolution;
+    controller_t *controller_info = (controller_t *)data;
 
-    err = bpf_map_lookup_elem(map_fd_fecConvolutionBuffer, &k, &fecConvolution);
-    if (err < 0) {
-        fprintf(stderr, "Error while taking the fecConvolution from userspace for controller\n");
-        return;
-    }
-
+    // Get the number of source symbols currently in the buffer
     uint8_t total_source_symbols_in_buffer = 0;
-    struct tlvSource__convo_t *tlv;
     uint8_t idx;
     for (k = 0; k < RLC_RECEIVER_BUFFER_SIZE; ++k) {
-        idx = (fecConvolution.encodingSymbolID - k) % RLC_RECEIVER_BUFFER_SIZE;
-        tlv = (struct tlvSource__convo_t *)&fecConvolution.sourceRingBuffer[idx].tlv;
-        if (tlv->encodingSymbolID == (fecConvolution.encodingSymbolID - k)) {
+        idx = (controller_info->encodingSymbolID - k) % RLC_RECEIVER_BUFFER_SIZE;
+        uint32_t source_symbol_id = controller_info->receivedEncodingSymbolId[idx];
+        if (source_symbol_id == (controller_info->encodingSymbolID - k)) {
             ++total_source_symbols_in_buffer;
         }
     }
 
-    uint8_t msg = 0;
+    // Update the counters
+    controller_received_counter += total_source_symbols_in_buffer;
+    controller_theoric_counter += RLC_RECEIVER_BUFFER_SIZE;
 
-    // Decision function
-    if (RLC_RECEIVER_BUFFER_SIZE - total_source_symbols_in_buffer > 1) {
-        printf("Received: %u\n", total_source_symbols_in_buffer);
-        msg = 1;
-    }
+    // Time to send an update message to the encoder
+    if (controller_theoric_counter >= controller_update_every) {
+        // Message to send to the encoder
+        uint8_t msg = 0; // Stop sending repair symbols
 
-    printf("Send control message with message: %u\n", msg);
-    err = send_raw_socket_controller(sfd, local_addr, encoder, msg);
-    if (err < 0) {
-        fprintf(stderr, "Error while sending the control message\n");
+        // Decision function
+        if ((controller_received_counter * 100) / controller_theoric_counter <= controller_threshold) {
+            msg = 1;
+        }
+
+        printf("Send a update with %u of %u: %u\n", controller_received_counter, controller_theoric_counter, msg);
+
+        // Reset the counter for next update
+        controller_received_counter = 0;
+        controller_theoric_counter = 0;
+
+        err = send_raw_socket_controller(sfd, local_addr, encoder, msg);
+        if (err < 0) {
+            fprintf(stderr, "Error while sending the control message\n");
+        }
     }
 }
 
@@ -131,7 +142,7 @@ static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
     uint8_t *controller_message = (uint8_t *)data;
     if ((*controller_message) & 0x4) {
         // This is a controller message
-        controller();
+        controller(data);
         return;
     }
     // This is a recovering information
@@ -337,7 +348,7 @@ int main(int argc, char **argv)
     struct bpf_map *map_fecConvolutionBuffer = skel->maps.fecConvolutionInfoMap;
     map_fd_fecConvolutionBuffer = bpf_map__fd(map_fecConvolutionBuffer);
     fecConvolution_t convo_struct_zero = {
-        .controller_repair = (5 << 4) + (1 << 1),
+        .controller_repair = (0),
     };
     printf("Value of controller repair: %u\n", convo_struct_zero.controller_repair);
     bpf_map_update_elem(map_fd_fecConvolutionBuffer, &k0, &convo_struct_zero, BPF_ANY);
