@@ -20,6 +20,8 @@
 #include <netinet/udp.h>
 #include <linux/seg6.h>
 
+#define MAX_CONTROLLER_UPDATE_LATENCY 100000
+
 enum fec_framework {
     CONVO = 0,
     BLOCK = 1,
@@ -31,7 +33,12 @@ typedef struct {
     enum fec_framework framework;
     bool attach;
     char interface[15];
+    uint8_t controller;
+    uint16_t controller_update_every;
+    uint8_t controller_threshold; // Percentage
 } args_t;
+
+args_t plugin_arguments;
 
 /* Used to detect the end of the program */
 static volatile int exiting = 0;
@@ -89,10 +96,9 @@ static void send_recovered_symbol_XOR(void *ctx, int cpu, void *data, __u32 data
     }
 }*/
 
+// Values used for the controller
 uint16_t controller_theoric_counter = 0;
 uint16_t controller_received_counter = 0;
-uint16_t controller_update_every = 1000;
-uint8_t controller_threshold = 98; // Percentage
 
 
 static void controller(void *data) {
@@ -116,12 +122,12 @@ static void controller(void *data) {
     controller_theoric_counter += RLC_RECEIVER_BUFFER_SIZE;
 
     // Time to send an update message to the encoder
-    if (controller_theoric_counter >= controller_update_every) {
+    if (controller_theoric_counter >= plugin_arguments.controller_update_every) {
         // Message to send to the encoder
         uint8_t msg = 0; // Stop sending repair symbols
 
         // Decision function
-        if ((controller_received_counter * 100) / controller_theoric_counter <= controller_threshold) {
+        if ((controller_received_counter * 100) / controller_theoric_counter <= plugin_arguments.controller_threshold) {
             msg = 1;
         }
 
@@ -206,6 +212,9 @@ void usage(char *prog_name) {
     fprintf(stderr, "    -d decoder_ip (default: fc00::9): IPv6 of the decoder router\n");
     fprintf(stderr, "    -a attach: if set, attempts to attach the program to *encoder_ip*\n");
     fprintf(stderr, "    -i interface: the interface to which attach the program (if *attach* is set)\n");
+    fprintf(stderr, "    -c controller: activate the controller mechanism\n");
+    fprintf(stderr, "    -l update latency: the number of packets between two controller update (default: 1000)\n");
+    fprintf(stderr, "    -t threshold: controller threshold below which repair symbols are forwarded (default: 98)\n");
 }
 
 int parse_args(args_t *args, int argc, char *argv[]) {
@@ -215,11 +224,14 @@ int parse_args(args_t *args, int argc, char *argv[]) {
     strcpy(args->encoder_ip, "fc00::a");
     args->framework = CONVO;
     args->attach = false;
+    args->controller = 0;
+    args->controller_threshold = 98;
+    args->controller_update_every = 1000;
 
     bool interface_if_attach = false;
 
     int opt;
-    while ((opt = getopt(argc, argv, "f:d:e:ai:")) != -1) {
+    while ((opt = getopt(argc, argv, "f:d:e:ai:cl:t:")) != -1) {
         switch (opt) {
             case 'f':
                 if (strncmp(optarg, "block", 6) == 0) {
@@ -254,6 +266,23 @@ int parse_args(args_t *args, int argc, char *argv[]) {
                     strncpy(args->interface, optarg, 15);
                 }
                 break;
+            case 'c':
+                args->controller = 1;
+                break;
+            case 'l':
+                args->controller_update_every = atoi(optarg);
+                if (args->controller_update_every <= 0 || args->controller_update_every > MAX_CONTROLLER_UPDATE_LATENCY) {
+                    fprintf(stderr, "Give a valid latency for the controller [0, %u]\n", MAX_CONTROLLER_UPDATE_LATENCY);
+                    return -1;
+                }
+                break;
+            case 't':
+                args->controller_threshold = atoi(optarg);
+                if (args->controller_threshold < 0 || args->controller_threshold > 100) {
+                    fprintf(stderr, "Give a valid threshold for the controller [0, 100]\n");
+                    return -1;
+                }
+                break;
             case '?':
                 usage(argv[0]);
                 return 1;
@@ -275,7 +304,6 @@ int main(int argc, char **argv)
     struct decoder_bpf *skel;
     int err;
 
-    args_t plugin_arguments;
     err = parse_args(&plugin_arguments, argc, argv);
     if (err != 0) {
         exit(EXIT_FAILURE);
@@ -302,8 +330,6 @@ int main(int argc, char **argv)
 
     /* Bump RLIMIT_MEMLOCK to allow BPF sub-system to do anything :3 */
     bump_memlock_rlimit();
-
-    printf("Valeur de la window: %u\n", RLC_RECEIVER_BUFFER_SIZE);
 
     /* Clean handling of Ctrl+C */
     signal(SIGINT, sig_handler);
@@ -348,9 +374,8 @@ int main(int argc, char **argv)
     struct bpf_map *map_fecConvolutionBuffer = skel->maps.fecConvolutionInfoMap;
     map_fd_fecConvolutionBuffer = bpf_map__fd(map_fecConvolutionBuffer);
     fecConvolution_t convo_struct_zero = {
-        .controller_repair = (0),
+        .controller_repair = plugin_arguments.controller,
     };
-    printf("Value of controller repair: %u\n", convo_struct_zero.controller_repair);
     bpf_map_update_elem(map_fd_fecConvolutionBuffer, &k0, &convo_struct_zero, BPF_ANY);
 
     struct bpf_map *map_events = skel->maps.events;

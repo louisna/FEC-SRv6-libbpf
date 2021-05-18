@@ -12,7 +12,7 @@ INCLUDES := -I$(OUTPUT) -I../libbpf/include/uapi
 CFLAGS := -g -Wall
 ARCH := $(shell uname -m | sed 's/x86_64/x86/')
 
-APPS = encoder decoder drop
+APPS = encoder decoder
 
 # Get Clang's default includes on this system. We'll explicitly add these dirs
 # to the includes list when compiling with `-target bpf` because otherwise some
