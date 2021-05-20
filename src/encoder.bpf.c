@@ -60,15 +60,15 @@ int srv6_fec_encode_convo(struct __sk_buff *skb)
     if (!fecConvolution) return BPF_ERROR;
 
     if (fecConvolution->controller_repair >> 1) {
-        /* Small trick here: we assume that if we still have at least
-        * two segments left, it corresponds to the FEC plugin because
-        * we need:
-        * - the decoder plugin
-        * - (intermediate segments)
-        * - the final destination 
-        * If we only have 1 segment left, we assume that it corresponds
-        * to an "information" packet and treat it like that without more check.
-        * This trick allows us to avoid using seg6_find_tlv for each source symbol*/
+        // Small trick here: we assume that if we still have at least
+        // two segments left, it corresponds to the FEC plugin because
+        // we need:
+        // - the decoder plugin
+        // - (intermediate segments)
+        // - the final destination 
+        // If we only have 1 segment left, we assume that it corresponds
+        // to an "information" packet and treat it like that without more check.
+        // This trick allows us to avoid using seg6_find_tlv for each source symbol*/
         if (srh->segments_left < 1) {
             //bpf_printk("Sender: passage\n");
             handle_controller(skb, srh, fecConvolution);
@@ -76,7 +76,10 @@ int srv6_fec_encode_convo(struct __sk_buff *skb)
         }
     }
 
+    if (fecConvolution->encodingSymbolID % 100000 == 0) bpf_printk("Sender: check %lu\n", fecConvolution->encodingSymbolID);
+
     struct tlvSource__convo_t tlv;
+    tlv.padding = 0;
     err = fecFramework__convolution(skb, &tlv, fecConvolution, &events);
     if (err < 0) {
         bpf_printk("Sender: Error in FEC Framework\n");
@@ -87,8 +90,10 @@ int srv6_fec_encode_convo(struct __sk_buff *skb)
     __u16 tlv_length = sizeof(struct tlvSource__convo_t);
     err = seg6_add_tlv(skb, srh, (srh->hdrlen + 1) << 3, (struct sr6_tlv_t *)&tlv, tlv_length);
     //bpf_printk("Sender: return value of TLV add: %d\n", err);
-    if (err < 0) bpf_printk("Sender: error\n");
-    return (err) ? BPF_ERROR : BPF_OK;
+    //if (err < 0) { 
+    //    bpf_printk("Sender: error. Length=%u, encodingSymbolID:%u\n", tlv_length, fecConvolution->encodingSymbolID);
+    //}
+    return BPF_OK;
 }
 
 SEC("lwt_seg6local_block")
@@ -118,6 +123,7 @@ int srv6_fec_encode_block(struct __sk_buff *skb)
     if (!mapStruct) { if (DEBUG) bpf_printk("Sender: impossible to get global pointer\n"); return BPF_ERROR;}
 
     struct tlvSource__block_t tlv;
+    tlv.padding = 0;
     err = fecFramework__block(skb, &tlv, mapStruct, &events);
     if (err < 0) {
         bpf_printk("Sender: Error in FEC Framework\n");
@@ -128,7 +134,7 @@ int srv6_fec_encode_block(struct __sk_buff *skb)
     __u16 tlv_length = sizeof(struct tlvSource__block_t);
     err = seg6_add_tlv(skb, srh, (srh->hdrlen + 1) << 3, (struct sr6_tlv_t *)&tlv, tlv_length);
     //bpf_printk("Sender: return value of TLV add: %d\n", err);
-    if (err < 0) bpf_printk("Sender: error\n");
+    //if (err < 0) bpf_printk("Sender: error\n");
     return (err) ? BPF_ERROR : BPF_OK;
 }
 

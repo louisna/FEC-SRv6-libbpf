@@ -28,6 +28,7 @@
 struct tlvSource__block_t {
     __u8 tlv_type;
     __u8 len;
+    __u16 padding;
     __u16 sourceBlockNb;
     __u16 sourceSymbolNb;
 } BPF_PACKET_HEADER;
@@ -52,6 +53,7 @@ struct tlvRepair__block_t {
 struct tlvSource__convo_t {
     __u8 tlv_type;
     __u8 len;
+    __u16 padding;
     __u32 encodingSymbolID;
 } BPF_PACKET_HEADER;
 

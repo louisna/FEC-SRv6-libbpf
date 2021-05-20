@@ -148,20 +148,24 @@ static __always_inline int seg6_add_tlv(struct __sk_buff *skb, struct ip6_srh_t 
 	if (tlv_off != -1)
 		tlv_off += srh_off;
 
-	if (itlv->type == SR6_TLV_PADDING || itlv->type == SR6_TLV_HMAC)
+	if (itlv->type == SR6_TLV_PADDING || itlv->type == SR6_TLV_HMAC) {
 		return -1;
+	}
 
 	err = __is_valid_tlv_boundary(skb, srh, &tlv_off, &pad_size, &pad_off);
-	if (err)
+	if (err) {
 		return err;
+	}
 
 	err = bpf_lwt_seg6_adjust_srh(skb, tlv_off, sizeof(*itlv) + itlv->len);
-	if (err)
+	if (err) {
 		return err;
+	}
 
 	err = bpf_lwt_seg6_store_bytes(skb, tlv_off, (void *)itlv, tlv_size);
-	if (err)
+	if (err) {
 		return err;
+	}
 
 	// the following can't be moved inside update_tlv_pad because the
 	// bpf verifier has some issues with it

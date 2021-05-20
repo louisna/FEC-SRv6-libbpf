@@ -309,7 +309,7 @@ int main(int argc, char *argv[]) {
     fecConvolution_t convo_init = {0};
     convo_init.currentWindowSize = plugin_arguments.window_size;
     convo_init.currentWindowSlide = plugin_arguments.window_slide;
-    convo_init.controller_repair = 3;
+    convo_init.controller_repair = 0;
     bpf_map_update_elem(map_fd_fecConvolutionBuffer, &k0, &convo_init, BPF_ANY);
 
     struct bpf_map *map_events = skel->maps.events;
