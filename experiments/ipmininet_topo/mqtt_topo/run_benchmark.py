@@ -60,13 +60,13 @@ print('Press Ctrl+C')
 
 #output_dir_template = lambda: f"/Volumes/LOUIS/thesis/results_without/mqtt_res_run_{i}.json"
 # output_dir_template = lambda: f"mqtt_topo/results_without_2500/mqtt_res_run_10_{idx}.json"
-output_dir_template = lambda: f"delay/rlc/mqtt_res_run_{idx}.json"
-mqtt_bench_template = f"/home/vagrant/go/bin/mqtt-benchmark --broker tcp://[2042:dd::1]:1883 --clients 5 --count 1500 --format json"
+output_dir_template = lambda: f"results_18_05/standard/mqtt_res_run_{i}.json"
+mqtt_bench_template = f"/home/vagrant/go/bin/mqtt-benchmark --broker tcp://[2042:dd::1]:1883 --clients 10 --count 500 --format json"
 
 scapy_args = Crafting(verbose=False, source="2042:aa::1", destination="fc00::9", port=3333)
+scapy_args_run = Crafting(verbose=False, source="2042:aa::1", destination="fc00::9", port=3334)
 
 for i in range(1):
-    idx = update_idx_delay()
     output_dir = output_dir_template()
     #os.system(f"echo [ >> {output_dir}")
     command = f"{mqtt_bench_template} "#>> {output_dir}"
@@ -75,10 +75,12 @@ for i in range(1):
         if j < 2:
             #os.system(f"echo , >> {output_dir}")
             pass
+        pkt = craft_srv6_packet(scapy_args_run, "yyyyyyyyyyyy")
+        send(pkt)
     #os.system(f"echo ] >> {output_dir}")
 
     # Notify the dropper that we can update the parameters for the next state
-    #pkt = craft_srv6_packet(scapy_args, "zzzzzzzzzzz")
+    pkt = craft_srv6_packet(scapy_args, "zzzzzzzzzzz")
     #send(pkt)
     print("Sent update packet !")
     time.sleep(0.1)

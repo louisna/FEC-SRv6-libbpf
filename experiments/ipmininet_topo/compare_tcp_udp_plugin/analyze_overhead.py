@@ -317,7 +317,7 @@ def analyze_tpc_congestion_window_all(analyze_function=scrap_cw, boxplot=False, 
         plt.xlabel("Value of the 'd' parameter of the Markov model")
         # plt.ylabel("TCP Congestion Window [kB]")
         fig.tight_layout()
-        fig.subplots_adjust(left=0.15, top=0.95)
+        # fig.subplots_adjust(left=0.15, top=0.95)
         plt.savefig("figures/exp_tcp_congestion_window_boxplot.svg")
         plt.show()
     elif min_max_ext:
@@ -748,15 +748,23 @@ def rlc_vs_udp():
 def analyze_controller():
     file_without = "results_17_05/udp_without_95_30_rlc_std_1s.csv"
     file_control = "results_17_05/udp_controller_95_30_rlc_std_1s.csv"  # Oops it is in ms and not seconds
+    filename_without_hd = "results_17_05/udp_without_95_30_rlc_std_1s_hD.csv"
+    filename_control_hd = "results_17_05/udp_controller_95_30_rlc_std_1s_hD.csv"
 
     data_without = pd.read_csv(file_without).values
     data_control = pd.read_csv(file_control).values
+    data_without_hd = pd.read_csv(filename_without_hd).values
+    data_control_hd = pd.read_csv(filename_control_hd).values
 
     idx_without = [i[0] for i in data_without]
     idx_control = [i[0] for i in data_control]
+    idx_without_hd = [i[0] for i in data_without_hd]
+    idx_control_hd = [i[0] for i in data_control_hd]
 
-    val_without = [i[1] for i in data_without]
-    val_control = [i[1] for i in data_control]
+    val_without = [i[1] / 1000 for i in data_without]
+    val_control = [i[1] / 1000 for i in data_control]
+    val_without_hd = [i[1] / 1000 for i in data_without_hd]
+    val_control_hd = [i[1] / 1000 for i in data_control_hd]
 
     # Must transform from 100ms to 1 sec oops => just for this run 
     val_control_sec = []
@@ -777,19 +785,250 @@ def analyze_controller():
     idx_control = idx_control_sec
 
     fig, ax = plt.subplots()
-    ax.plot(idx_without, val_without)
-    ax.plot(idx_control, val_control)
-    plt.ylim((170000, 350000))
+    ax.grid()
+    ax.set_axisbelow(True)
+
+    p_control = []
+    p_without = []
+    p, = ax.plot(idx_without, val_without, color="darkblue", label="rE")
+    p_without.append(p)
+    p, = ax.plot(idx_control, val_control, linestyle=":", color="firebrick", label="rE")
+    p_control.append(p)
+    p, = ax.plot(idx_without_hd, val_without_hd, linestyle="-", color="darkcyan", label="hD")
+    p_without.append(p)
+    p, = ax.plot(idx_control_hd, val_control_hd, linestyle="-.", color="darkred", label="hD")
+    p_control.append(p)
+    p5, = plt.plot([0], marker='None',
+                linestyle='None', label='dummy-tophead')
+    leg3 = plt.legend([p5] + p_without + [p5] + p_control,
+                    ["Standard"] + ["rE", "hD"] + ["Controller"] + ["rE", "hD"],
+                    loc="best", ncol=2) # Two columns, vertical group labels
+    ax.set_xlabel("Time of the experiment [s]")
+    ax.set_ylabel("KBytes received by tcpdump per 1 second")
+    plt.ylim((140, 380))
+    plt.savefig("figures/exp_controller_udp.svg")
     plt.show()
+
+
+def controller_by_k():
+    dir_std = "results_18_05/standard/"
+    dir_ctr = "results_18_05/controller"
+    _, _, filenames_std = next(os.walk(dir_std))
+    _, _, filenames_ctr = next(os.walk(dir_ctr))
+
+    sorted_filenames_std = sorted(filenames_std, key=sort_list_by_idx)
+    sorted_filenames_ctr = sorted(filenames_ctr, key=sort_list_by_idx)
+
+    loss_std = []
+    loss_ctr = []
+
+    for filename in tqdm(sorted_filenames_std):
+        path = os.path.join(dir_std, filename)
+        loss_std.append(json_udp_loss(path, jitter=False))
     
+    for filename in tqdm(sorted_filenames_ctr):
+        path = os.path.join(dir_ctr, filename)
+        loss_ctr.append(json_udp_loss(path, jitter=False))
+    
+    fig, ax = plt.subplots()
+    
+    ax.plot(loss_std)
+    ax.plot(loss_ctr)
+    plt.ylim((-1, 16.5))
+    plt.show()
+
+
+def analyze_controller_udp_traffic(cdf=False, jitter=False):
+    _, _, filenames_std = next(os.walk("results_18_05/udp_controller/standard"))
+    _, _, filenames_ctr = next(os.walk("results_18_05/udp_controller/controller"))
+
+    sorted_filenames_std = sorted(filenames_std, key=sort_list_by_idx)
+    sorted_filenames_ctr = sorted(filenames_ctr, key=sort_list_by_idx)
+
+    loss_std = []
+    loss_ctr = []
+
+    for filename in tqdm(sorted_filenames_std):
+        path = os.path.join("results_18_05/udp_controller/standard", filename)
+        loss_std.append(json_udp_loss(path, jitter=jitter))
+    
+    for filename in tqdm(sorted_filenames_ctr):
+        path = os.path.join("results_18_05/udp_controller/controller", filename)
+        loss_ctr.append(json_udp_loss(path, jitter=jitter))
+    
+    loss_std_by_k = []
+    loss_ctr_by_k = []
+
+    for k in range(4):
+        by_d_std = []
+        by_d_ctr = []
+        for d in range(26):
+            idx = k * 26 + d
+            by_d_std.append(loss_std[idx])
+            by_d_ctr.append(loss_ctr[idx])
+        loss_std_by_k.append(by_d_std)
+        loss_ctr_by_k.append(by_d_ctr)
+    
+    baseline = json_udp_loss("results_18_05/udp_controller/baseline.json", jitter=jitter)
+    
+    fig, ax = plt.subplots()
+    ax.grid()
+    ax.set_axisbelow(True)
+
+    if cdf:
+        max_val = max([max(loss_std), max(loss_ctr)])
+        hist_std, bin_edges_std = np.histogram(loss_std, bins=60, range=(0, max_val + 0.5), density=True)
+        hist_ctr, bin_edges_ctr = np.histogram(loss_ctr, bins=60, range=(0, max_val + 0.5), density=True)
+        dx = bin_edges_std[1] - bin_edges_std[0]
+        cdf_std = np.cumsum(hist_std) * dx
+        cdf_ctr = np.cumsum(hist_ctr) * dx
+
+        # Dummy values
+        cdf_ctr = np.insert(cdf_ctr, 0, 0)
+        cdf_std = np.insert(cdf_std, 0, 0)
+        bin_edges_ctr = [0] + bin_edges_ctr
+        bin_edges_std = [0] + bin_edges_std
+
+        ax.plot(bin_edges_std, cdf_std, label="Standard", color="red", linestyle="-")
+        ax.plot(bin_edges_ctr, cdf_ctr, label="Controller", color="darkblue", linestyle="-.")
+        if jitter:
+            ax.set_xlabel("Jitter [ms]")
+        else:
+            ax.set_xlabel("Percentage of loss during the benchmark [%]")
+        ax.set_ylabel("CDF")
+        plt.legend(loc="best")
+        if jitter:
+            plt.savefig("figures/exp_controller_udp_jitter_cdf.svg")
+        else:
+            plt.savefig("figures/exp_controller_udp_loss_cdf.svg")
+        plt.show()
+    else:
+        k_idx = [99, 96, 93, 90]
+        d_idx = np.arange(0, 51, 2)
+        tp_str = ["k=" + str(i) for i in k_idx]
+        linestyles = ["-", "--", "-.", ":"]
+        colors_std = ["lightcoral", "red", "firebrick", "darkred"]
+        colors_ctr = ["slategrey", "darkcyan", "royalblue", "darkblue"]
+        p_std = []  # Legend link
+        p_ctr = []
+
+        for i, k in enumerate(loss_std_by_k):
+            p, = ax.plot(d_idx, k, linestyle=linestyles[i], color=colors_std[i])
+            p_std.append(p)
+        for i, k  in enumerate(loss_ctr_by_k):
+            p, = ax.plot(d_idx, k, linestyle=linestyles[i], color=colors_ctr[i])
+            p_ctr.append(p)
+        
+        ax.plot([0, 50], [baseline] * 2, linestyle=":", color="black")
+
+        # Dummy plot
+        p5, = plt.plot([0], marker='None',
+            linestyle='None', label='dummy-tophead')
+
+        ax.set_xlabel("Value of the 'd' parameter of the Markov dropper model")
+        if jitter:
+            ax.set_ylabel("Jitter [ms]")
+        else:    
+            ax.set_ylabel("Percentage of loss during the benchmark [%]")
+        # plt.legend(ncol=2,handleheight=2.4, labelspacing=0.05)
+        leg3 = plt.legend([p5] + p_std + [p5] + p_ctr,
+                ["Standard"] + tp_str + ["Controller"] + tp_str,
+                loc=2, ncol=2) # Two columns, vertical group labels
+        if jitter:
+            plt.savefig("figures/exp_controller_udp_jitter.svg")
+        else:
+            plt.savefig("figures/exp_controller_udp_loss.svg")
+        plt.show()
+
+
+def scrap_bytes_from_controller(filename):
+    with open(filename, "r") as fd:
+        lines = fd.readlines()
+    
+    median_results = []
+
+    counter = 0
+    local_res = []
+    for line in lines:
+        if line.split()[-3] == "Total":
+            if int(line.split()[-1]) >= 1000000:
+                local_res.append(int(line.split()[-1]))
+            counter += 1
+        if counter == 3:
+            median_results.append(np.median(local_res))
+            local_res = []
+            counter = 0
+    return median_results
+
+
+def controller_udp_bytes(cdf=False):
+    baseline = scrap_bytes_from_controller("results_18_05/udp_controller/baseline_dropper_output.txt")[0]
+    standard = scrap_bytes_from_controller("results_18_05/udp_controller/standard_dropper_output.txt")
+    controller = scrap_bytes_from_controller("results_18_05/udp_controller/controller_dropper_output.txt")
+    print(standard)
+    print("---")
+    print(controller)
+
+    fig, ax = plt.subplots()
+    ax.grid()
+    ax.set_axisbelow(True)
+
+    if cdf:
+        std_normalized = [(i / baseline) * 100 for i in standard]
+        ctr_normalized = [(i / baseline) * 100 for i in controller]
+        min_r = min(min(std_normalized), min(ctr_normalized)) - 1
+        max_r = max(max(std_normalized), max(ctr_normalized)) + 1
+
+        hist_without, bin_edges_without = np.histogram(std_normalized, bins=60, range=(100, 300), density=True)
+        hist_with, bin_edges_with = np.histogram(ctr_normalized, bins=60, range=(100, 300), density=True)
+        dx = bin_edges_without[1] - bin_edges_without[0]
+        cdf_without = np.cumsum(hist_without) * dx
+        cdf_with = np.cumsum(hist_with) * dx
+
+        cdf_without_filtered = []
+        cdf_rfc_filtered = []
+        for i in cdf_without:
+            if i < 0.0001:
+                cdf_without_filtered.append(-10)
+            elif i > 99.999:
+                cdf_without_filtered.append(10)
+            else:
+                cdf_without_filtered.append(i)
+        for i in cdf_with:
+            if i < 0.0001:
+                cdf_rfc_filtered.append(-10)
+            elif i > 99.999:
+                cdf_rfc_filtered.append(10)
+            else:
+                cdf_rfc_filtered.append(i)
+        
+        # Plot the baseline
+        ax.plot([100, 100], [0, 1], color="black", linestyle=":", label="Baseline UDP", linewidth=3)
+
+        ax.plot(bin_edges_without[1:], cdf_without_filtered, label="Standard", color="red", linestyle="-")
+        ax.plot(bin_edges_with[1:], cdf_rfc_filtered, label="Controller", color="darkblue", linestyle="-.")
+
+        ax.set_xlabel("Data sent compared to the UDP baseline (i.e. without loss) [%]")
+        ax.set_ylabel("CDF")
+        plt.legend()
+        plt.ylim((0, 1))
+
+        # plt.title("Data sent by the MQTT clients (+ the UDP traffic)\nDepending on k and d from the Markov loss model")
+        # plt.ylim((min_r, max_r))
+        plt.savefig("figures/udp_controller_bytes.svg")
+        plt.show()
+
 
 
 if __name__ == "__main__":
     # plugin_overhead()
-    # analyze_tpc_congestion_window_all(scrap_cw, boxplot=True)
+    analyze_tpc_congestion_window_all(scrap_cw, boxplot=True)
     # analyze_udp_loss(cdf=True, boxplot=True)
     # analyze_tcp_quality()
     # analyze_retransmission()
     # analyze_udp_traffic(cdf=True, jitter=False)
     # rlc_vs_udp()
-    analyze_controller()
+    # analyze_controller()
+    # controller_by_k()
+    # analyze_controller_udp_traffic(cdf=True)
+    # controller_udp_bytes(cdf=True)

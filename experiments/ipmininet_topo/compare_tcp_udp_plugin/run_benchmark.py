@@ -66,26 +66,29 @@ signal.signal(signal.SIGINT, signal_handler)
 print('Press Ctrl+C')
 if args.tcp_quality == 0:
     transport_cmd = "--udp -l 280" if args.udp else "-M 280"
-    output_dir_template = lambda: f" >> {args.output}"
+    output_dir_template = lambda: f" >> {args.output}/baseline.json"
     bench_template = f"iperf3 -c 2042:dd::1 -t {args.t} {transport_cmd} --json"
+    # bench_template = f"iperf3 -c 2042:dd::1 --bytes 10000000 {transport_cmd} --json"
     print(bench_template)
     scapy_args = Crafting(verbose=False, source="2042:aa::1", destination=update_destination, port=3333)
+    scapy_args_run = Crafting(verbose=False, source="2042:aa::1", destination=update_destination, port=3334)
 
     for i in range(1):
         print(i)
         output_dir = "" if args.output is None else output_dir_template()
-        #os.system(f"echo [ {output_dir}")
+        os.system(f"echo [ {output_dir}")
         command = f"{bench_template} {output_dir}"
-        for i in range(1):
+        for i in range(3):
             os.system(command)
             if i < 2:
-                #os.system(f"echo , {output_dir}")
-                pass
-        #os.system(f"echo ] {output_dir}")
+                os.system(f"echo , {output_dir}")
+                pkt = craft_srv6_packet(scapy_args_run, "yyyyyyyyyyyy")
+                send(pkt)
+        os.system(f"echo ] {output_dir}")
 
         # Notify the dropper that we can update the parameters for the next state
         pkt = craft_srv6_packet(scapy_args, "zzzzzzzzzzz")
-        #send(pkt)
+        send(pkt)
         print("Sent update packet !")
         time.sleep(0.1)
 else:

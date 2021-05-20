@@ -48,7 +48,7 @@ def send_packets_default(args) -> None:
     payload_template = lambda: f"{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}"
 
     for i in range(int(args.number_packets)):
-        pkt = craft_srv6_packet(args, payload_template())
+        pkt = craft_srv6_packet(args, payload_template()[:(i % 26) + 10])
         send(pkt, count=args.block)
         time.sleep(args.sleep_time)
 
