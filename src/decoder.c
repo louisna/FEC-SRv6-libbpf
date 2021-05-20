@@ -131,7 +131,7 @@ static void controller(void *data) {
             msg = 1;
         }
 
-        printf("Send a update with %u of %u: %u\n", controller_received_counter, controller_theoric_counter, msg);
+        //printf("Send a update with %u of %u: %u\n", controller_received_counter, controller_theoric_counter, msg);
 
         // Reset the counter for next update
         controller_received_counter = 0;
@@ -267,7 +267,7 @@ int parse_args(args_t *args, int argc, char *argv[]) {
                 }
                 break;
             case 'c':
-                args->controller = 1;
+                args->controller = 2;
                 break;
             case 'l':
                 args->controller_update_every = atoi(optarg);
