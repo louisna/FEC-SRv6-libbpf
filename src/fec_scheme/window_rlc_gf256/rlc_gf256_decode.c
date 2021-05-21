@@ -1,7 +1,8 @@
 #include <stdint.h>
-#include "../prng/tinymt32.c"
-#include "../gf256/swif_symbol.c"
-#include "../decoder.h"
+#include "../../prng/tinymt32.c"
+#include "../../gf256/swif_symbol.c"
+#include "../../decoder.h"
+#include "../../raw_socket/raw_socket_receiver.h"
 
 #define MIN(a, b) ((a < b) ? a : b)
 #define MAX_WINDOW_CHECK 5

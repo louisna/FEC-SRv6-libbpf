@@ -49,6 +49,7 @@ def send_packets_default(args) -> None:
 
     for i in range(int(args.number_packets)):
         pkt = craft_srv6_packet(args, payload_template()[:(i % 26) + 10])
+        # pkt = craft_srv6_packet(args, f"{args.p}{args.p}{args.p}{args.p}{args.p}{args.p}{args.p}{args.p}{args.p}{args.p}{args.p}{args.p}{args.p}{args.p}{args.p}{args.p}{args.p}{args.p}{args.p}"[:(i % 26) + 10])
         send(pkt, count=args.block)
         time.sleep(args.sleep_time)
 
@@ -89,6 +90,7 @@ def main():
     parser.add_argument("-v", "--verbose", help="Print debug messages", action="store_true")
     parser.add_argument("-d", "--destination", help="Packet destination if no segments", type=str, default=None)
     parser.add_argument("--port", help="destination port", type=int, default=4444)
+    parser.add_argument("-p", type=str, default=0)
     args = parser.parse_args()
 
     print(args, file=sys.stderr)

@@ -1,7 +1,8 @@
 #include <stdint.h>
-#include "../prng/tinymt32.c"
-#include "../gf256/swif_symbol.c"
-#include "../encoder.h"
+#include "../../prng/tinymt32.c"
+#include "../../gf256/swif_symbol.c"
+#include "../../encoder.h"
+#include "../../raw_socket/raw_socket_sender.h"
 #define MIN(a, b) ((a < b) ? a : b)
 
 static void rlc__get_coefs(tinymt32_t *prng, uint32_t seed, int n, uint8_t coefs[n]) {
