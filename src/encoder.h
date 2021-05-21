@@ -21,17 +21,16 @@ struct repairSymbol_t {
     __u16 packet_length;
 };
 
-typedef struct mapStruct {
+typedef struct {
     __u16 soubleBlock;
     __u16 sourceSymbolCount;
     struct sourceSymbol_t sourceSymbol;
     struct repairSymbol_t repairSymbol;
     __u8 currentBlockSize;
-    struct bpf_spin_lock lock;
-} mapStruct_t;
+} fecBlock_user_t;
 
 /* CONVOLUTION */
-typedef struct fecConvolution {
+typedef struct {
     __u32 encodingSymbolID;
     __u16 repairKey;
     __u8 ringBuffSize; // Number of packets for next coding in the ring buffer
@@ -39,9 +38,8 @@ typedef struct fecConvolution {
     struct tlvRepair__convo_t repairTlv[RLC_RS_NUMBER];
     __u8 currentWindowSize;
     __u8 currentWindowSlide;
-    struct bpf_spin_lock lock;
     __u8 controller_repair;
-} fecConvolution_t;
+} fecConvolution_user_t;
 
 typedef struct {
     __u8 *muls;

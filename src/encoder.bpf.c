@@ -9,7 +9,7 @@
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
 #include "libseg6.c"
-#include "encoder.h"
+#include "encoder.bpf.h"
 #include "fec_framework/window_sender.c"
 #include "fec_framework/block_sender.c"
 
@@ -119,7 +119,7 @@ int srv6_fec_encode_block(struct __sk_buff *skb)
     }
 
     /* Get pointer to structure of the plugin */
-    mapStruct_t *mapStruct = bpf_map_lookup_elem(&fecBuffer, &k);
+    fecBlock_t *mapStruct = bpf_map_lookup_elem(&fecBuffer, &k);
     if (!mapStruct) { if (DEBUG) bpf_printk("Sender: impossible to get global pointer\n"); return BPF_ERROR;}
 
     struct tlvSource__block_t tlv;

@@ -12,7 +12,7 @@
 #include "decoder.skel.h"
 #include <bpf/bpf.h>
 #include "decoder.h"
-#include "raw_socket_receiver.c"
+#include "raw_socket/raw_socket_receiver.h"
 #include "fec_scheme/window_rlc_gf256/rlc_gf256_decode.c"
 #include <arpa/inet.h>
 #include <netinet/ip6.h>

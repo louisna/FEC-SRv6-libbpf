@@ -9,7 +9,7 @@
 #endif
 
 #include "../../libseg6.c"
-#include "../../encoder.h"
+#include "../../encoder.bpf.h"
 
 static __always_inline int fecScheme__convoRLC(struct __sk_buff *skb, fecConvolution_t *fecConvolution, __u8 newRingBuffSize, __u32 encodingSymbolID) {
     int err;

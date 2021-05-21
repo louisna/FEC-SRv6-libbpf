@@ -11,8 +11,8 @@
 #include <bpf/libbpf.h>
 #include "encoder.skel.h"
 #include <bpf/bpf.h>
-#include "encoder.h"
-#include "raw_socket_sender.c"
+#include "encoder.bpf.h"
+#include "raw_socket/raw_socket_sender.h"
 #include "fec_scheme/window_rlc_gf256/rlc_gf256.c"
 
 enum fec_framework {
@@ -79,7 +79,7 @@ static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz)
 }
 
 static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
-    fecConvolution_t *fecConvolution = (fecConvolution_t *)data;
+    fecConvolution_user_t *fecConvolution = (fecConvolution_user_t *)data;
     //printf("Call triggered: %d\n", fecConvolution->encodingSymbolID);
     //printf("And the TLV value is: %u type=%u\n", fecConvolution->repairTlv[0].encodingSymbolID, fecConvolution->repairTlv[0].tlv_type);
 
@@ -300,7 +300,7 @@ int main(int argc, char *argv[]) {
     /* Get file descriptor of maps and init the value of the structures */
     struct bpf_map *map_fecBuffer = skel->maps.fecBuffer;
     int map_fd_fecBuffer = bpf_map__fd(map_fecBuffer);
-    mapStruct_t block_init = {0};
+    fecBlock_t block_init = {0};
     block_init.currentBlockSize = plugin_arguments.block_size;
     bpf_map_update_elem(map_fd_fecBuffer, &k0, &block_init, BPF_ANY);
 
@@ -309,7 +309,7 @@ int main(int argc, char *argv[]) {
     fecConvolution_t convo_init = {0};
     convo_init.currentWindowSize = plugin_arguments.window_size;
     convo_init.currentWindowSlide = plugin_arguments.window_slide;
-    convo_init.controller_repair = 0;
+    convo_init.controller_repair = 1;
     bpf_map_update_elem(map_fd_fecConvolutionBuffer, &k0, &convo_init, BPF_ANY);
 
     struct bpf_map *map_events = skel->maps.events;

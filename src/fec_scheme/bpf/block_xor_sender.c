@@ -38,7 +38,7 @@ static __always_inline int xor_on_the_line(struct __sk_buff *skb, struct repairS
     return 0;
 }
 
-static __always_inline int fecScheme__blockXOR(struct __sk_buff *skb, mapStruct_t *mapStruct, __u16 sourceSymbolCount, __u16 sourceBlock)  {
+static __always_inline int fecScheme__blockXOR(struct __sk_buff *skb, fecBlock_t *mapStruct, __u16 sourceSymbolCount, __u16 sourceBlock)  {
     int err;
     int k0 = 0;
 

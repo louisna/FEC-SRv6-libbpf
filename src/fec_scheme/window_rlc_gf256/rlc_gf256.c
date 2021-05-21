@@ -14,7 +14,7 @@ static void rlc__get_coefs(tinymt32_t *prng, uint32_t seed, int n, uint8_t coefs
     }
 }
 
-static int rlc__generate_a_repair_symbol(fecConvolution_t *fecConvolution, encode_rlc_t *rlc, int idx) {
+static int rlc__generate_a_repair_symbol(fecConvolution_user_t *fecConvolution, encode_rlc_t *rlc, int idx) {
     uint16_t max_length = 0;
     uint32_t encodingSymbolID = fecConvolution->encodingSymbolID - 1;
     struct repairSymbol_t *repairSymbol = rlc->repairSymbol;
@@ -84,7 +84,7 @@ static int rlc__generate_a_repair_symbol(fecConvolution_t *fecConvolution, encod
     return 0;
 }
 
-int rlc__generate_repair_symbols(fecConvolution_t *fecConvolution, encode_rlc_t *rlc, int sfd, struct sockaddr_in6 *src, struct sockaddr_in6 *dst) {
+int rlc__generate_repair_symbols(fecConvolution_user_t *fecConvolution, encode_rlc_t *rlc, int sfd, struct sockaddr_in6 *src, struct sockaddr_in6 *dst) {
     int err;
     for (int i = 0; i < RLC_RS_NUMBER; ++i) {
         // Generate repair symbol #i

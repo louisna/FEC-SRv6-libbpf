@@ -9,7 +9,7 @@
 #endif
 
 #include "../libseg6.c"
-#include "../encoder.h"
+#include "../encoder.bpf.h"
 #include "store_packet_sender.c"
 #include "../fec_scheme/bpf/convo_rlc_sender.c"
 
@@ -95,12 +95,12 @@ static __always_inline int fecFramework__convolution(struct __sk_buff *skb, void
     /* A repair symbol must be generated
      * Forward all data to user space for computation for now as we cannot perform that is the kernel
      * due to the current limitations */
-    //bpf_printk("Rentre ici wtf\n");
+    //bpf_printk("Rentre ici wtf valeur de ret: %u\n", ret);
     if (ret && (fecConvolution->controller_repair & 0x1)) {
-        for_user_space_t *to_user_space = (for_user_space_t *)fecConvolution;
+        fecConvolution_user_t *to_user_space = (fecConvolution_user_t *)fecConvolution;
         //bpf_printk("Parfois faut aussi envoyer des paquets\n");
         //bpf_printk("Send data to user space with encodingSymbolID: %u\n", to_user_space->encodingSymbolID);
-        bpf_perf_event_output(skb, map, BPF_F_CURRENT_CPU, fecConvolution, sizeof(for_user_space_t));
+        bpf_perf_event_output(skb, map, BPF_F_CURRENT_CPU, fecConvolution, sizeof(fecConvolution_user_t));
     } else if (!ret) {
         //bpf_printk("Hooo yeeaaaaah\n");
         fecConvolution->ringBuffSize = ringBuffSize; // The value is updated by the FEC Scheme if we generate repair symbols

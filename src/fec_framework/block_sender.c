@@ -17,10 +17,10 @@ struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 1);
     __type(key, __u32);
-    __type(value, mapStruct_t);
+    __type(value, fecBlock_t);
 } fecBuffer SEC(".maps");
 
-static __always_inline int fecFramework__block(struct __sk_buff *skb, void *csh_void, mapStruct_t *mapStruct, void *map) {
+static __always_inline int fecFramework__block(struct __sk_buff *skb, void *csh_void, fecBlock_t *mapStruct, void *map) {
     int err;
 
     /* Load the source symbol structure to store the packet */
