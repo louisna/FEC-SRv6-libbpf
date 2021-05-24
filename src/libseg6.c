@@ -299,8 +299,8 @@ static __always_inline int seg6_find_tlv2(struct __sk_buff *skb, struct ip6_srh_
 		if (bpf_skb_load_bytes(skb, cursor, &tlv, sizeof(struct sr6_tlv_t)))
 			return -1;
 		//bpf_trace_printk("TLV type=%d len=%d found at offset %d\n", tlv.type, tlv.len, cursor);
-		if ((tlv.type == 156 && tlv.len + sizeof(struct sr6_tlv_t) == source_tlv_length) ||
-			(tlv.type == 157 && tlv.len + sizeof(struct sr6_tlv_t) == repair_tlv_length)) {
+		if ((tlv.type == 28 && tlv.len + sizeof(struct sr6_tlv_t) == source_tlv_length) ||
+			(tlv.type == 29 && tlv.len + sizeof(struct sr6_tlv_t) == repair_tlv_length)) {
 			*tlv_type = tlv.type;
 			return cursor;
 		}

@@ -82,7 +82,6 @@ static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
     fecConvolution_user_t *fecConvolution = (fecConvolution_user_t *)data;
     //printf("Call triggered: %d\n", fecConvolution->encodingSymbolID);
     //printf("And the TLV value is: %u type=%u\n", fecConvolution->repairTlv[0].encodingSymbolID, fecConvolution->repairTlv[0].tlv_type);
-
     /* Generate the repair symbol */
     int err = rlc__generate_repair_symbols(fecConvolution, rlc, sfd, &src, &dst);
     if (err < 0) {
@@ -293,7 +292,18 @@ int main(int argc, char *argv[]) {
             plugin_arguments.encoder_ip, framework_str, plugin_arguments.interface);
         fprintf(stderr, "Command used to attach: %s\n", attach_cmd);
         system(attach_cmd);
+
+        // Now the same for the controller
+        if (1) { // TODO !
+            memset(attach_cmd, 0, sizeof(char) * 200);
+            char *controller_str = "fc00::b"; // TODO
+            sprintf(attach_cmd, "ip -6 route add %s encap seg6local action End.BPF endpoint fd /sys/fs/bpf/encoder/lwt_seg6local_controller section srv6_fec dev %s",
+            controller_str, plugin_arguments.interface);
+            fprintf(stderr, "Command used to attach the controller: %s\n", attach_cmd);
+            system(attach_cmd);
+        }
     }
+
 
     int k0 = 0;
 
@@ -309,6 +319,7 @@ int main(int argc, char *argv[]) {
     fecConvolution_t convo_init = {0};
     convo_init.currentWindowSize = plugin_arguments.window_size;
     convo_init.currentWindowSlide = plugin_arguments.window_slide;
+    printf("Window slide is: %u\n", convo_init.currentWindowSlide);
     convo_init.controller_repair = 1;
     bpf_map_update_elem(map_fd_fecConvolutionBuffer, &k0, &convo_init, BPF_ANY);
 
@@ -356,6 +367,12 @@ cleanup:
         sprintf(detach_cmd, "ip -6 route del %s", plugin_arguments.encoder_ip);
         fprintf(stderr, "Command used to detach: %s\n", detach_cmd);
         system(detach_cmd);
+
+        if (1) { // TODO
+        sprintf(detach_cmd, "ip -6 route del fc00::b");
+        fprintf(stderr, "Command used to detach controller: %s\n", detach_cmd);
+        system(detach_cmd);
+        }
     }
     return 0;
 }

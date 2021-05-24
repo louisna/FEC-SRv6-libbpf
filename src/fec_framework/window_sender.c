@@ -50,8 +50,6 @@ static __always_inline int fecFramework__convolution(struct __sk_buff *skb, void
     // TODO: maybe do the check to update the ring buff size directly here
     bpf_spin_unlock(&fecConvolution->lock);
 
-    __u8 DT = 15; // TODO find good value
-
     //bpf_printk("Valeur de dinwod size=%u et %u\n", windowSize, (MAX_RLC_WINDOW_SIZE - 1));
 
     /* Complete the source symbol TLV */

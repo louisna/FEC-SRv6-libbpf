@@ -20,20 +20,6 @@ struct {
     __uint(value_size, sizeof(__u32));
 } events SEC(".maps");
 
-static __always_inline void handle_controller(struct __sk_buff *skb, struct ip6_srh_t *srh, fecConvolution_t *fecConvolution) {
-    tlv_controller_t tlv;
-    long cursor = seg6_find_tlv(skb, srh, TLV_CODING_SOURCE, sizeof(tlv));
-    if (cursor < 0) return;
-
-    if (bpf_skb_load_bytes(skb, cursor, &tlv, sizeof(tlv)) < 0) return;
-
-    /* Update internal value controlling the sending of repair symbol
-     * with the value of the tlv.
-     * We only update the last bit as the penultimate controls if we want to use the controller */
-    fecConvolution->controller_repair = tlv.controller_repair + 2;
-    //bpf_printk("Sender: update the controller with value: %d\n", tlv.controller_repair);
-}
-
 SEC("lwt_seg6local_convo")
 int srv6_fec_encode_convo(struct __sk_buff *skb)
 {
@@ -58,25 +44,6 @@ int srv6_fec_encode_convo(struct __sk_buff *skb)
 
     fecConvolution_t *fecConvolution = bpf_map_lookup_elem(&fecConvolutionInfoMap, &k);
     if (!fecConvolution) return BPF_ERROR;
-
-    if (fecConvolution->controller_repair >> 1) {
-        // Small trick here: we assume that if we still have at least
-        // two segments left, it corresponds to the FEC plugin because
-        // we need:
-        // - the decoder plugin
-        // - (intermediate segments)
-        // - the final destination 
-        // If we only have 1 segment left, we assume that it corresponds
-        // to an "information" packet and treat it like that without more check.
-        // This trick allows us to avoid using seg6_find_tlv for each source symbol*/
-        if (srh->segments_left < 1) {
-            //bpf_printk("Sender: passage\n");
-            handle_controller(skb, srh, fecConvolution);
-            return BPF_DROP;
-        }
-    }
-
-    if (fecConvolution->encodingSymbolID % 100000 == 0) bpf_printk("Sender: check %lu\n", fecConvolution->encodingSymbolID);
 
     struct tlvSource__convo_t tlv;
     tlv.padding = 0;
@@ -136,6 +103,44 @@ int srv6_fec_encode_block(struct __sk_buff *skb)
     //bpf_printk("Sender: return value of TLV add: %d\n", err);
     //if (err < 0) bpf_printk("Sender: error\n");
     return (err) ? BPF_ERROR : BPF_OK;
+}
+
+SEC("lwt_seg6local_controller")
+static int handle_controller(struct __sk_buff *skb) {
+    int k = 0;
+
+    /* Get Segment Routing Header */
+    struct ip6_srh_t *srh = seg6_get_srh(skb);
+    if (!srh) {
+        if (DEBUG) bpf_printk("Sender: impossible to get the SRH\n");
+        return BPF_DROP;
+    }
+
+    fecConvolution_t *fecConvolution = bpf_map_lookup_elem(&fecConvolutionInfoMap, &k);
+    if (!fecConvolution) return BPF_ERROR;
+
+    tlv_controller_t tlv;
+    long cursor = seg6_find_tlv(skb, srh, TLV_CODING_SOURCE, sizeof(tlv));
+    if (cursor < 0) {
+        bpf_printk("ICI erreur\n");
+        return BPF_DROP;
+    }
+
+    if (bpf_skb_load_bytes(skb, cursor, &tlv, sizeof(tlv)) < 0) return BPF_DROP;
+
+    bpf_spin_lock(&fecConvolution->lock);
+
+    /* Update internal value controlling the sending of repair symbol
+     * with the value of the tlv.
+     * We only update the last bit as the penultimate controls if we want to use the controller */
+    fecConvolution->controller_repair = tlv.controller_repair + 2;
+    //bpf_printk("Sender: update the controller with value: %d\n", tlv.controller_repair);
+
+    bpf_spin_unlock(&fecConvolution->lock);
+
+    bpf_printk("Updated controller with value: %u\n", tlv.controller_repair);
+
+    return BPF_DROP;
 }
 
 char LICENSE[] SEC("license") = "GPL";
