@@ -26,7 +26,7 @@ static __always_inline int fecScheme__convoRLC(struct __sk_buff *skb, fecConvolu
             // memset(repairTlv, 0, sizeof(tlvRepair__convo_t));
             repairTlv->tlv_type = TLV_CODING_REPAIR; // TODO: change also ?
             repairTlv->len = sizeof(struct tlvRepair__convo_t) - 2;
-            repairTlv->unused = 0;
+            repairTlv->unused = 15; // Unused = 4 bits unused + 4 bits DT
             repairTlv->encodingSymbolID = encodingSymbolID; // Set to the value of the last source symbol of the window
             repairTlv->repairFecInfo = (windowSlide << 16) + repairKey;
             repairTlv->nss = windowSize;
