@@ -1,8 +1,8 @@
 #ifndef FEC_SRH_H_
 #define FEC_SRH_H_
 
-#define TLV_CODING_SOURCE 156
-#define TLV_CODING_REPAIR 157
+#define TLV_CODING_SOURCE 28
+#define TLV_CODING_REPAIR 29
 #define MAX_PACKET_SIZE 512
 
 #define my_memset(ptr, size) ({\
@@ -47,7 +47,7 @@ struct tlvRepair__block_t {
 
 /* Convolutional FEC FRamework */
 #define MAX_RLC_WINDOW_SIZE 16
-#define MAX_RLC_WINDOW_SLIDE 4
+#define MAX_RLC_WINDOW_SLIDE 5
 #define MAX_RLC_REPAIR_GEN 8
 
 struct tlvSource__convo_t {
