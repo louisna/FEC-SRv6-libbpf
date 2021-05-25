@@ -11,7 +11,10 @@ typedef struct {
     struct tlvRepair__convo_t repairTlv[RLC_RS_NUMBER];
     __u8 currentWindowSize;
     __u8 currentWindowSlide;
-    __u8 controller_repair;
+    // Controller parameters
+    __u8 controller_repair; // Enabling or not the controller
+    __u8 controller_threshold; // Threshold for the decision function
+    __u16 controller_period; // Period between two statistics messages
     struct bpf_spin_lock lock;
 } fecConvolution_t;
 

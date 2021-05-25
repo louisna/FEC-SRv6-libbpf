@@ -213,7 +213,7 @@ int send_raw_socket_recovered(int sfd, const void *repairSymbol_void, struct soc
     return 0;
 }
 
-int send_raw_socket_controller(int sfd, struct sockaddr_in6 decoder, struct sockaddr_in6 encoder, uint8_t msg) {
+int send_raw_socket_controller(int sfd, struct sockaddr_in6 decoder, struct sockaddr_in6 encoder, controller_t *controller) {
     uint8_t packet[4200];
     size_t packet_length;
     struct ip6_hdr *iphdr;
@@ -260,14 +260,14 @@ int send_raw_socket_controller(int sfd, struct sockaddr_in6 decoder, struct sock
     tlv = (tlv_controller_t *)&packet[ip6_length + srh_length];
     tlv->tlv_type = TLV_CODING_SOURCE;
     tlv->len = sizeof(tlv_controller_t) - 2;
-    tlv->controller_repair = msg;
-    tlv->padding1 = 0;
-    tlv->padding4 = 0;
+    tlv->padding = 0;
+    tlv->theoretical_counter = controller->theoretical_counter;
+    tlv->received_counter = controller->received_counter;
 
     /* UDP header */
     uhdr = (struct udphdr *)&packet[ip6_length + srh_length + tlv_length];
-    uhdr->uh_sport = htons(50);
-    uhdr->uh_dport = htons(50);
+    uhdr->uh_sport = htons(0);
+    uhdr->uh_dport = htons(0);
     uhdr->uh_ulen  = 0;
     uhdr->uh_sum   = 0;
 

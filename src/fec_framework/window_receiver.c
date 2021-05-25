@@ -70,9 +70,6 @@ static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *sk
         return -1;
     }
 
-    // Complete the reserved structure of the controller
-    fecConvolution->receivedEncodingSymbolID[ringBufferIndex & (RLC_RECEIVER_BUFFER_SIZE - 1)] = encodingSymbolID;
-
     /* Store source symbol */
     err = storePacket_decode(skb, sourceSymbol);
     if (err < 0) {
@@ -86,48 +83,49 @@ static __always_inline int receiveSourceSymbol__convolution(struct __sk_buff *sk
     /* Copy the TLV for later use */
     memcpy(&sourceSymbol->tlv, &tlv, sizeof(struct tlvSource__convo_t));
 
-    //bpf_printk("Receiver: stored source symbol: %d %d!\n", sourceSymbol->packet_length, encodingSymbolID);
+    // Update the controller update period
+    fecConvolution->controller_update = tlv.controller_update;
 
-    /* Indicate to all window information structures in the neighboorhood of the 
-     * source symbol that it has been processed. As the repair symbol encodingSymbolID is the value
-     * of the last source symbol => update windows after this source symbol */
-    /*for (__u8 i = 0; i < windowSize; ++i) {
-        __u8 windowRingBufferIndex = (encodingSymbolID + i) % RLC_RECEIVER_BUFFER_SIZE;
-        window_info_t *window_info = &fecConvolution->windowInfoBuffer[windowRingBufferIndex & (RLC_RECEIVER_BUFFER_SIZE - 1)];
-        ++(window_info->received_ss);
-    }*/
-
-    /* Try to recover from lost packet */
-    // TODO
-    if (0) {
-        bpf_perf_event_output(skb, map, BPF_F_CURRENT_CPU, fecConvolution, sizeof(fecConvolution_t));
-    }
-
-    /* Call the controller program every 32 received source symbols 
-     * First condition: the controller is enabled
-     * Second condition: received 32 source symbols after last update 
-     *      recall: the number of received source symbols since last update is
-     *      stored in the highest order byte of controller_repair */
-    if (fecConvolution->controller_repair & 0x2) {
+    // Call the controller program every 32 received source symbols 
+    // First condition: the controller is enabled
+    // Second condition: received 32 source symbols after last update 
+    //      recall: the number of received source symbols since last update is
+    //      stored in the highest order byte of controller_repair
+    if (fecConvolution->controller_update > 0) {
         // First increment the counter
-        fecConvolution->controller_repair += (1 << 8);
+        ++fecConvolution->received_counter;
 
-        if ((fecConvolution->controller_repair >> 8) >= RLC_RECEIVER_BUFFER_SIZE) {
-            fecConvolution->encodingSymbolID = encodingSymbolID;
+        // The following lines update the encodingSymbolID only if it is more recent than what we have
+        // => take into account reordering that could jeopardize the good statistics
+        if ((fecConvolution->most_recent_encodingSymbolID < encodingSymbolID && 
+                encodingSymbolID - fecConvolution->most_recent_encodingSymbolID < RLC_RECEIVER_BUFFER_SIZE) ||
+                (fecConvolution->most_recent_encodingSymbolID > encodingSymbolID && 
+                encodingSymbolID - fecConvolution->most_recent_encodingSymbolID > RLC_RECEIVER_BUFFER_SIZE)) {
+            fecConvolution->most_recent_encodingSymbolID = encodingSymbolID;
+        }
+
+        // Compute theoretical counter
+        __u16 theoretical_counter = fecConvolution->most_recent_encodingSymbolID - fecConvolution->last_encodingSymbolID;
+        if (theoretical_counter >= fecConvolution->controller_update) {
+            controller_t controller_info = {0};
             
-            // Update message for the userspace and reset counter
-            fecConvolution->controller_repair = 6;
+            // 4 => this is a controller message, 2 => controller enabled
+            controller_info.controller_repair = 6;
+
+            // Set counters
+            controller_info.received_counter = fecConvolution->received_counter;
+            controller_info.theoretical_counter = theoretical_counter;
 
             // Get lightweight structure for the perf output
-            controller_t *controller_info = (controller_t *)fecConvolution;
-            bpf_perf_event_output(skb, map, BPF_F_CURRENT_CPU, controller_info, sizeof(controller_t));
+            bpf_perf_event_output(skb, map, BPF_F_CURRENT_CPU, &controller_info, sizeof(controller_t));
             
-            // Reset the value of the message
-            fecConvolution->controller_repair = 2;
+            // Reset the counter and last update
+            fecConvolution->last_encodingSymbolID = fecConvolution->most_recent_encodingSymbolID;
+            fecConvolution->received_counter = 0;
         }
     }
 
-    return 0; //try_to_recover__convoRLC(skb, fecConvolution);
+    return 0;
 }
 
 static __always_inline int receiveRepairSymbol__convolution(struct __sk_buff *skb, struct ip6_srh_t *srh, int tlv_offset, void *map) {
@@ -166,7 +164,6 @@ static __always_inline int receiveRepairSymbol__convolution(struct __sk_buff *sk
     /* Get pointer to information of the window */
     window_info_t *window_info = &fecConvolution->windowInfoBuffer[windowRingBufferIndex & (RLC_RECEIVER_BUFFER_SIZE - 1)];
     // TODO: check if already received repair symbol ?
-    //bpf_printk("Will store a repair symbol with encodingSymbolID=%u at index %u\n", encodingSymbolID, windowRingBufferIndex & (RLC_RECEIVER_BUFFER_SIZE - 1));
     struct repairSymbol_t *repairSymbol = &window_info->repairSymbol;
 
     /* Store repair symbol */

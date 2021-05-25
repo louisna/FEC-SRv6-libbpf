@@ -185,7 +185,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
         struct tlvRepair__convo_t *repairTLV = (struct tlvRepair__convo_t *)&window_info->repairSymbol.tlv;
         if (current_encodingSymbolID == repairTLV->encodingSymbolID) {
             rlc_window_size = repairTLV->nss; // Assumes that these two values will always be the same
-            rlc_window_slide = repairTLV->repairFecInfo >> 16;
+            rlc_window_slide = (repairTLV->repairFecInfo >> 16) & 0xf; // DT in the 8 highest order bits
             ++effective_window_check;
             current_encodingSymbolID -= rlc_window_slide;
         } else {

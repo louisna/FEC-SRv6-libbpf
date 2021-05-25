@@ -20,8 +20,6 @@
 #include <netinet/udp.h>
 #include <linux/seg6.h>
 
-#define MAX_CONTROLLER_UPDATE_LATENCY 100000
-
 enum fec_framework {
     CONVO = 0,
     BLOCK = 1,
@@ -33,9 +31,6 @@ typedef struct {
     enum fec_framework framework;
     bool attach;
     char interface[15];
-    uint8_t controller;
-    uint16_t controller_update_every;
-    uint8_t controller_threshold; // Percentage
 } args_t;
 
 args_t plugin_arguments;
@@ -90,57 +85,13 @@ static void send_recovered_symbol_XOR(void *ctx, int cpu, void *data, __u32 data
     send_raw_socket_recovered(sfd, repairSymbol, local_addr);
 }
 
-/*static void debug_print(fecConvolution_t *fecConvolution) {
-    for (int i = 0; i < RLC_RECEIVER_BUFFER_SIZE; ++i) {
-        printf("Valeur du source symbol is: %d\n", ((struct tlvSource__convo_t *)(&fecConvolution->sourceRingBuffer[i].tlv))->encodingSymbolID);
-    }
-}*/
-
-// Values used for the controller
-uint16_t controller_theoric_counter = 0;
-uint16_t controller_received_counter = 0;
-
-
 static void controller(void *data) {
-    int k = 0;
     int err;
     controller_t *controller_info = (controller_t *)data;
 
-    // Get the number of source symbols currently in the buffer
-    uint8_t total_source_symbols_in_buffer = 0;
-    uint8_t idx;
-    for (k = 0; k < RLC_RECEIVER_BUFFER_SIZE; ++k) {
-        idx = (controller_info->encodingSymbolID - k) % RLC_RECEIVER_BUFFER_SIZE;
-        uint32_t source_symbol_id = controller_info->receivedEncodingSymbolId[idx];
-        if (source_symbol_id == (controller_info->encodingSymbolID - k)) {
-            ++total_source_symbols_in_buffer;
-        }
-    }
-
-    // Update the counters
-    controller_received_counter += total_source_symbols_in_buffer;
-    controller_theoric_counter += RLC_RECEIVER_BUFFER_SIZE;
-
-    // Time to send an update message to the encoder
-    if (controller_theoric_counter >= plugin_arguments.controller_update_every) {
-        // Message to send to the encoder
-        uint8_t msg = 0; // Stop sending repair symbols
-
-        // Decision function
-        if ((controller_received_counter * 100) / controller_theoric_counter <= plugin_arguments.controller_threshold) {
-            msg = 1;
-        }
-
-        //printf("Send a update with %u of %u: %u\n", controller_received_counter, controller_theoric_counter, msg);
-
-        // Reset the counter for next update
-        controller_received_counter = 0;
-        controller_theoric_counter = 0;
-
-        err = send_raw_socket_controller(sfd, local_addr, encoder, msg);
-        if (err < 0) {
-            fprintf(stderr, "Error while sending the control message\n");
-        }
+    err = send_raw_socket_controller(sfd, local_addr, encoder, controller_info);
+    if (err < 0) {
+        fprintf(stderr, "Error while sending the control message\n");
     }
 }
 
@@ -153,9 +104,6 @@ static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
     }
     // This is a recovering information
     fecConvolution_t *fecConvolution = (fecConvolution_t *)data;
-    //printf("Call triggered: %d\n", fecConvolution->encodingSymbolID);
-
-    //debug_print(fecConvolution);
 
     ++globalCount;
 
@@ -165,8 +113,6 @@ static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
     int err = rlc__fec_recover(fecConvolution, rlc, sfd, local_addr);
     if (err < 0) {
         printf("ERROR. TODO: handle\n");
-    } else {
-        //printf("Correctly finished\n");
     }
 }
 
@@ -190,8 +136,7 @@ static void handle_events(int map_fd_events, enum fec_framework framework) {
     }
 
     /* Enter in loop until a signal is retrieved
-     * Poll the recovered packet from the BPF program
-     */
+     * Poll the recovered packet from the BPF program */
     while (!exiting) {
         err = perf_buffer__poll(pb, 100);
         if (err < 0 && errno != EINTR) {
@@ -208,30 +153,24 @@ void usage(char *prog_name) {
     fprintf(stderr, "USAGE:\n");
     fprintf(stderr, "    %s [-f framework] [-d decoder ipv6]\n", prog_name);
     fprintf(stderr, "    -f framework (default: convo): FEC Framework to use [convo, block]\n");
-    fprintf(stderr, "    -e encoder_ip (default: fc00::a): IPv6 of the encoder router\n");
-    fprintf(stderr, "    -d decoder_ip (default: fc00::9): IPv6 of the decoder router\n");
+    fprintf(stderr, "    -e encoder_ip (default: fc00::b): SID of the encoder controller\n");
+    fprintf(stderr, "    -d decoder_ip (default: fc00::9): SID of the decoder FEC\n");
     fprintf(stderr, "    -a attach: if set, attempts to attach the program to *encoder_ip*\n");
     fprintf(stderr, "    -i interface: the interface to which attach the program (if *attach* is set)\n");
-    fprintf(stderr, "    -c controller: activate the controller mechanism\n");
-    fprintf(stderr, "    -l update latency: the number of packets between two controller update (default: 1000)\n");
-    fprintf(stderr, "    -t threshold: controller threshold below which repair symbols are forwarded (default: 98)\n");
 }
 
 int parse_args(args_t *args, int argc, char *argv[]) {
     memset(args, 0, sizeof(args_t));
     // Default values
     strcpy(args->decoder_ip, "fc00::9");
-    strcpy(args->encoder_ip, "fc00::a");
+    strcpy(args->encoder_ip, "fc00::b");
     args->framework = CONVO;
     args->attach = false;
-    args->controller = 0;
-    args->controller_threshold = 98;
-    args->controller_update_every = 1000;
 
     bool interface_if_attach = false;
 
     int opt;
-    while ((opt = getopt(argc, argv, "f:d:e:ai:cl:t:")) != -1) {
+    while ((opt = getopt(argc, argv, "f:d:e:ai:")) != -1) {
         switch (opt) {
             case 'f':
                 if (strncmp(optarg, "block", 6) == 0) {
@@ -264,23 +203,6 @@ int parse_args(args_t *args, int argc, char *argv[]) {
                 if (args->attach) {
                     interface_if_attach = true;
                     strncpy(args->interface, optarg, 15);
-                }
-                break;
-            case 'c':
-                args->controller = 2;
-                break;
-            case 'l':
-                args->controller_update_every = atoi(optarg);
-                if (args->controller_update_every <= 0 || args->controller_update_every > MAX_CONTROLLER_UPDATE_LATENCY) {
-                    fprintf(stderr, "Give a valid latency for the controller [0, %u]\n", MAX_CONTROLLER_UPDATE_LATENCY);
-                    return -1;
-                }
-                break;
-            case 't':
-                args->controller_threshold = atoi(optarg);
-                if (args->controller_threshold < 0 || args->controller_threshold > 100) {
-                    fprintf(stderr, "Give a valid threshold for the controller [0, 100]\n");
-                    return -1;
                 }
                 break;
             case '?':
@@ -374,7 +296,7 @@ int main(int argc, char **argv)
     struct bpf_map *map_fecConvolutionBuffer = skel->maps.fecConvolutionInfoMap;
     map_fd_fecConvolutionBuffer = bpf_map__fd(map_fecConvolutionBuffer);
     fecConvolution_t convo_struct_zero = {
-        .controller_repair = plugin_arguments.controller,
+        .controller_repair = 2,
     };
     bpf_map_update_elem(map_fd_fecConvolutionBuffer, &k0, &convo_struct_zero, BPF_ANY);
 

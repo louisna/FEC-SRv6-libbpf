@@ -46,7 +46,6 @@ int srv6_fec_encode_convo(struct __sk_buff *skb)
     if (!fecConvolution) return BPF_ERROR;
 
     struct tlvSource__convo_t tlv;
-    tlv.padding = 0;
     err = fecFramework__convolution(skb, &tlv, fecConvolution, &events);
     if (err < 0) {
         bpf_printk("Sender: Error in FEC Framework\n");
@@ -130,15 +129,19 @@ static int handle_controller(struct __sk_buff *skb) {
 
     bpf_spin_lock(&fecConvolution->lock);
 
+    fecConvolution->controller_repair = 2;
+
     /* Update internal value controlling the sending of repair symbol
      * with the value of the tlv.
      * We only update the last bit as the penultimate controls if we want to use the controller */
-    fecConvolution->controller_repair = tlv.controller_repair + 2;
+    if ((tlv.received_counter * 100) / tlv.theoretical_counter <= 98) {
+        fecConvolution->controller_repair += 1;
+    }
     //bpf_printk("Sender: update the controller with value: %d\n", tlv.controller_repair);
 
     bpf_spin_unlock(&fecConvolution->lock);
 
-    bpf_printk("Updated controller with value: %u\n", tlv.controller_repair);
+    bpf_printk("Stats received: %u on %u\n", tlv.received_counter, tlv.theoretical_counter);
 
     return BPF_DROP;
 }

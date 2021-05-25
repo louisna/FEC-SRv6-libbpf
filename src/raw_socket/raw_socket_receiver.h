@@ -18,6 +18,6 @@
 
 int send_raw_socket_recovered(int sfd, const void *repairSymbol_void, struct sockaddr_in6 local_addr);
 
-int send_raw_socket_controller(int sfd, struct sockaddr_in6 decoder, struct sockaddr_in6 encoder, uint8_t msg);
+int send_raw_socket_controller(int sfd, struct sockaddr_in6 decoder, struct sockaddr_in6 encoder, controller_t *controller);
 
 #endif

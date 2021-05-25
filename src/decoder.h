@@ -45,13 +45,17 @@ typedef struct {
 } window_info_t;
 
 typedef struct {
-    __u16 controller_repair;
+    __u8 controller_repair;
     __u32 encodingSymbolID; // Of the current repair symbol
-    __u32 receivedEncodingSymbolID[RLC_RECEIVER_BUFFER_SIZE]; // encodingSymbolID received (redundant but faster !)
     __u16 repairKey;
     __u8 ringBuffSize; // Number of packets for next coding in the ring buffer
     struct sourceSymbol_t sourceRingBuffer[RLC_RECEIVER_BUFFER_SIZE];
     window_info_t windowInfoBuffer[RLC_RECEIVER_BUFFER_SIZE];
+    /* Controller values */
+    __u32 most_recent_encodingSymbolID;
+    __u32 last_encodingSymbolID; // Of the previous update
+    __u16 received_counter;
+    __u16 controller_update;
 } fecConvolution_t;
 
 typedef struct {
@@ -67,9 +71,9 @@ typedef struct {
 } decode_rlc_t;
 
 typedef struct {
-    __u16 controller_repair;
-    __u32 encodingSymbolID;
-    __u32 receivedEncodingSymbolId[RLC_RECEIVER_BUFFER_SIZE];
+    __u8 controller_repair;
+    __u16 received_counter;
+    __u16 theoretical_counter;
 } controller_t;
 
 #endif

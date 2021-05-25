@@ -35,30 +35,28 @@ static __always_inline int fecFramework__convolution(struct __sk_buff *skb, void
     
     int ret;
 
-    /* Ensures that we do not try to protect a too big packet */
+    // Ensures that we do not try to protect a too big packet
     if (skb->len > MAX_PACKET_SIZE) {
         return -1;
     }
 
-    /* Update encodingSymbolID: wraps to zero after 2^32 - 1 */
+    // Get parameters of the Framework *safely*
     bpf_spin_lock(&fecConvolution->lock);
     __u32 encodingSymbolID = fecConvolution->encodingSymbolID;
     __u16 repairKey = fecConvolution->repairKey;
     __u8 ringBuffSize = fecConvolution->ringBuffSize;
     __u8 windowSize = fecConvolution->currentWindowSize;
-    fecConvolution->encodingSymbolID = encodingSymbolID + 1;
+    fecConvolution->encodingSymbolID = encodingSymbolID + 1; // Already update the encodingSymbolID for next
     // TODO: maybe do the check to update the ring buff size directly here
     bpf_spin_unlock(&fecConvolution->lock);
 
-    //bpf_printk("Valeur de dinwod size=%u et %u\n", windowSize, (MAX_RLC_WINDOW_SIZE - 1));
-
-    /* Complete the source symbol TLV */
-    tlv->tlv_type = TLV_CODING_SOURCE; // TODO: other value to distinguish ??
+    // Complete the source symbol TLV
+    tlv->tlv_type = TLV_CODING_SOURCE;
     tlv->len = sizeof(struct tlvSource__convo_t) - 2;
     tlv->encodingSymbolID = encodingSymbolID;
-    //bpf_printk("Send packet with encodingSymbolID=%u and repairKey=%u\n", encodingSymbolID, repairKey);
+    tlv->controller_update = fecConvolution->controller_period;
 
-    /* Get pointer in the ring buffer to store the source symbol */
+    // Get pointer in the ring buffer to store the source symbol
     __u32 ringBufferIndex = encodingSymbolID % windowSize;
     if (ringBufferIndex < 0 || ringBufferIndex >= windowSize) { // Check for the eBPF verifier
         if (DEBUG) bpf_printk("Sender: RLC index to ring buffer\n");
@@ -66,12 +64,12 @@ static __always_inline int fecFramework__convolution(struct __sk_buff *skb, void
     }
     struct sourceSymbol_t *sourceSymbol = &fecConvolution->sourceRingBuffer[ringBufferIndex & (RLC_BUFFER_SIZE - 1)];
     // Custom memset
-    /*__u64 *ss64 = (__u64 *)sourceSymbol->packet;
-    for (int i = 0; i < MAX_PACKET_SIZE / 8; ++i) {
-        ss64[i] = 0;
-    }*/
+    //__u64 *ss64 = (__u64 *)sourceSymbol->packet;
+    //for (int i = 0; i < MAX_PACKET_SIZE / 8; ++i) {
+    //    ss64[i] = 0;
+    //}
 
-    /* Store source symbol */
+    // Store source symbol
     ret = storePacket(skb, sourceSymbol);
     if (ret < 0) { // Error
         if (DEBUG) bpf_printk("Sender: error from storePacket confirmed\n");
@@ -81,30 +79,24 @@ static __always_inline int fecFramework__convolution(struct __sk_buff *skb, void
         return -1;
     }
 
-    /* The ring buffer contains a new source symbol */
+    // The ring buffer contains a new source symbol
     ++ringBuffSize;
 
-    /* Call coding function */
+    // Call coding function
     ret = fecScheme__convoRLC(skb, fecConvolution, ringBuffSize, encodingSymbolID);
     if (ret < 0) {
         return -1;
     }
 
-    /* A repair symbol must be generated
-     * Forward all data to user space for computation for now as we cannot perform that is the kernel
-     * due to the current limitations */
-    //bpf_printk("Rentre ici wtf valeur de ret: %u\n", ret);
+    // A repair symbol must be generated
+    // Forward all data to user space for computation for now as we cannot perform that is the kernel
+    // due to the current limitations
     if (ret && (fecConvolution->controller_repair & 0x1)) {
         fecConvolution_user_t *to_user_space = (fecConvolution_user_t *)fecConvolution;
-        //bpf_printk("Parfois faut aussi envoyer des paquets\n");
-        //bpf_printk("Send data to user space with encodingSymbolID: %u\n", to_user_space->encodingSymbolID);
         bpf_perf_event_output(skb, map, BPF_F_CURRENT_CPU, fecConvolution, sizeof(fecConvolution_user_t));
     } else if (!ret) {
-        //bpf_printk("Hooo yeeaaaaah\n");
         fecConvolution->ringBuffSize = ringBuffSize; // The value is updated by the FEC Scheme if we generate repair symbols
     }
-
-    // bpf_printk("Sender: will forward packet with encodingSymbolID=%u\n", encodingSymbolID);
 
     return 0;
 }

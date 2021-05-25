@@ -15,6 +15,8 @@
 #include "raw_socket/raw_socket_sender.h"
 #include "fec_scheme/window_rlc_gf256/rlc_gf256.c"
 
+#define MAX_CONTROLLER_UPDATE_LATENCY 10000
+
 enum fec_framework {
     CONVO = 0,
     BLOCK = 1,
@@ -29,6 +31,10 @@ typedef struct {
     uint8_t window_slide;
     bool attach;
     char interface[15];
+    char controller_ip[48];
+    uint8_t controller;
+    uint16_t controller_update_every;
+    uint8_t controller_threshold; // Percentage
 } args_t;
 
 
@@ -144,6 +150,9 @@ void usage(char *prog_name) {
     fprintf(stderr, "    -s window_slide (default: 2) slide of the window after each repair symbol (used if framework is convo)\n");
     fprintf(stderr, "    -a attach: if set, attempts to attach the program to *encoder_ip*\n");
     fprintf(stderr, "    -i interface: the interface to which attach the program (if *attach* is set)\n");
+    fprintf(stderr, "    -c controller_ip (default: fc00::b): activate the controller mechanism\n");
+    fprintf(stderr, "    -l update latency: the number of packets between two controller update (default: 1000)\n");
+    fprintf(stderr, "    -t threshold: controller threshold below which repair symbols are forwarded (default: 98)\n");
 }
 
 int parse_args(args_t *args, int argc, char *argv[]) {
@@ -156,11 +165,15 @@ int parse_args(args_t *args, int argc, char *argv[]) {
     args->window_size = 4;
     args->window_slide = 2;
     args->attach = false;
+    strcpy(args->controller_ip, "fc00::b");
+    args->controller = 1;
+    args->controller_threshold = 98;
+    args->controller_update_every = 1000;
 
     bool interface_if_attach = false;
 
     int opt;
-    while ((opt = getopt(argc, argv, "f:e:d:b:w:s:ai:")) != -1) {
+    while ((opt = getopt(argc, argv, "f:e:d:b:w:s:ai:c:t:l:")) != -1) {
         switch (opt) {
             case 'f':
                 if (strncmp(optarg, "block", 6) == 0) {
@@ -214,6 +227,28 @@ int parse_args(args_t *args, int argc, char *argv[]) {
                 if (args->attach) {
                     interface_if_attach = true;
                     strncpy(args->interface, optarg, 15);
+                }
+                break;
+            case 'c':
+                args->controller = 3;
+                if (strlen(optarg) > 48) {
+                    fprintf(stderr, "Wrong controller SID: %s\n", optarg);
+                    return -1;
+                }
+                strncpy(args->controller_ip, optarg, 48);
+                break;
+            case 'l':
+                args->controller_update_every = atoi(optarg);
+                if (args->controller_update_every <= 0 || args->controller_update_every > MAX_CONTROLLER_UPDATE_LATENCY) {
+                    fprintf(stderr, "Give a valid latency for the controller [0, %u]\n", MAX_CONTROLLER_UPDATE_LATENCY);
+                    return -1;
+                }
+                break;
+            case 't':
+                args->controller_threshold = atoi(optarg);
+                if (args->controller_threshold < 0 || args->controller_threshold > 100) {
+                    fprintf(stderr, "Give a valid threshold for the controller [0, 100]\n");
+                    return -1;
                 }
                 break;
             case '?':
@@ -316,11 +351,13 @@ int main(int argc, char *argv[]) {
 
     struct bpf_map *map_fecConvolutionBuffer = skel->maps.fecConvolutionInfoMap;
     int map_fd_fecConvolutionBuffer = bpf_map__fd(map_fecConvolutionBuffer);
-    fecConvolution_t convo_init = {0};
-    convo_init.currentWindowSize = plugin_arguments.window_size;
-    convo_init.currentWindowSlide = plugin_arguments.window_slide;
-    printf("Window slide is: %u\n", convo_init.currentWindowSlide);
-    convo_init.controller_repair = 1;
+    fecConvolution_t convo_init = {
+        .currentWindowSize = plugin_arguments.window_size,
+        .currentWindowSlide = plugin_arguments.window_slide,
+        .controller_repair = plugin_arguments.controller,
+        .controller_threshold = plugin_arguments.controller_threshold,
+        .controller_period = plugin_arguments.controller_update_every,
+    };
     bpf_map_update_elem(map_fd_fecConvolutionBuffer, &k0, &convo_init, BPF_ANY);
 
     struct bpf_map *map_events = skel->maps.events;

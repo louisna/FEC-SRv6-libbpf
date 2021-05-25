@@ -53,14 +53,14 @@ struct tlvRepair__block_t {
 struct tlvSource__convo_t {
     __u8 tlv_type;
     __u8 len;
-    __u16 padding;
+    __u16 controller_update;
     __u32 encodingSymbolID;
 } BPF_PACKET_HEADER;
 
 struct tlvRepair__convo_t {
     __u8 tlv_type;
     __u8 len;
-    __u16 unused;
+    __u16 controller_update;
     __u32 encodingSymbolID;
     __u32 repairFecInfo;
     __u16 coded_payload_len;
@@ -72,9 +72,9 @@ struct tlvRepair__convo_t {
 typedef struct {
     __u8 tlv_type;
     __u8 len;
-    __u8 controller_repair;
-    __u8 padding1;
-    __u32 padding4;
+    __u16 padding;
+    __u16 received_counter;
+    __u16 theoretical_counter;
 } tlv_controller_t;
 
 #endif
