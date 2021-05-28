@@ -54,7 +54,7 @@ int srv6_fec_encode_convo(struct __sk_buff *skb)
 
     // Add the TLV to the current source symbol and forward 
     __u16 tlv_length = sizeof(struct tlvSource__convo_t);
-    err = seg6_add_tlv(skb, srh, (srh->hdrlen + 1) << 3, (struct sr6_tlv_t *)&tlv, tlv_length);
+    err = seg6_add_tlv(skb, srh, -1, (struct sr6_tlv_t *)&tlv, tlv_length);
 
     return BPF_OK;
 }

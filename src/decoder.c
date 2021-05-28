@@ -158,7 +158,7 @@ void usage(char *prog_name) {
     fprintf(stderr, "    -d decoder_ip (default: fc00::9): SID of the decoder FEC\n");
     fprintf(stderr, "    -a attach: if set, attempts to attach the program to *encoder_ip*\n");
     fprintf(stderr, "    -i interface: the interface to which attach the program (if *attach* is set)\n");
-    fprintf(stderr, "    -g: enable debug information\n")
+    fprintf(stderr, "    -g: enable debug information\n");
 }
 
 int parse_args(args_t *args, int argc, char *argv[]) {
