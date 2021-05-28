@@ -1,0 +1,30 @@
+#ifndef ENCODER_BPF_H
+#define ENCODER_BPF_H
+
+#include "encoder.h"
+
+typedef struct {
+    __u32 encodingSymbolID;
+    __u16 repairKey;
+    __u8 ringBuffSize; // Number of packets for next coding in the ring buffer
+    struct sourceSymbol_t sourceRingBuffer[RLC_BUFFER_SIZE];
+    struct tlvRepair__convo_t repairTlv[RLC_RS_NUMBER];
+    __u8 currentWindowSize;
+    __u8 currentWindowSlide;
+    // Controller parameters
+    __u8 controller_repair; // Enabling or not the controller
+    __u8 controller_threshold; // Threshold for the decision function
+    __u16 controller_period; // Period between two statistics messages
+    struct bpf_spin_lock lock;
+} fecConvolution_t;
+
+typedef struct {
+    __u16 soubleBlock;
+    __u16 sourceSymbolCount;
+    struct sourceSymbol_t sourceSymbol;
+    struct repairSymbol_t repairSymbol;
+    __u8 currentBlockSize;
+    struct bpf_spin_lock lock;
+} fecBlock_t;
+
+#endif
