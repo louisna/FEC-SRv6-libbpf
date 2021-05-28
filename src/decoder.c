@@ -45,6 +45,9 @@ static volatile int map_fd_fecConvolutionBuffer;
 static struct sockaddr_in6 local_addr;
 static struct sockaddr_in6 encoder;
 
+static bool debug = false;
+static int debug_counter = 0;
+
 decode_rlc_t *rlc = NULL;
 
 static void sig_handler(int sig)
@@ -96,10 +99,18 @@ static void fecScheme_RLC(void *ctx, int cpu, void *data, __u32 data_sz) {
         controller(data);
         return;
     }
+
+    if (debug) {
+        ++debug_counter;
+        if (debug_counter % 10000 == 0) {
+            fprintf(stderr, "Passage");
+        }
+    }
+
     // This is a recovering information
     fecConvolution_t *fecConvolution = (fecConvolution_t *)data;
 
-    // Generate the repair symbol
+    // Try to recover symbol
     int err = rlc__fec_recover(fecConvolution, rlc, sfd, local_addr);
     if (err < 0) {
         fprintf(stderr, "ERROR. TODO: handle\n");
@@ -147,6 +158,7 @@ void usage(char *prog_name) {
     fprintf(stderr, "    -d decoder_ip (default: fc00::9): SID of the decoder FEC\n");
     fprintf(stderr, "    -a attach: if set, attempts to attach the program to *encoder_ip*\n");
     fprintf(stderr, "    -i interface: the interface to which attach the program (if *attach* is set)\n");
+    fprintf(stderr, "    -g: enable debug information\n")
 }
 
 int parse_args(args_t *args, int argc, char *argv[]) {
@@ -160,7 +172,7 @@ int parse_args(args_t *args, int argc, char *argv[]) {
     bool interface_if_attach = false;
 
     int opt;
-    while ((opt = getopt(argc, argv, "f:d:e:ai:")) != -1) {
+    while ((opt = getopt(argc, argv, "f:d:e:ai:g")) != -1) {
         switch (opt) {
             case 'f':
                 if (strncmp(optarg, "block", 6) == 0) {
@@ -194,6 +206,9 @@ int parse_args(args_t *args, int argc, char *argv[]) {
                     interface_if_attach = true;
                     strncpy(args->interface, optarg, 15);
                 }
+                break;
+            case 'g':
+                debug = true;
                 break;
             case '?':
                 usage(argv[0]);
