@@ -9,7 +9,6 @@
 #define RLC_BUFFER_SIZE MAX_RLC_WINDOW_SIZE
 #define RLC_RS_NUMBER 1
 
-/* Structures */
 struct sourceSymbol_t {
     __u8 packet[MAX_PACKET_SIZE];
     __u16 packet_length;
@@ -29,7 +28,7 @@ typedef struct {
     __u8 currentBlockSize;
 } fecBlock_user_t;
 
-/* CONVOLUTION */
+// CONVOLUTION
 typedef struct {
     __u32 encodingSymbolID;
     __u16 repairKey;

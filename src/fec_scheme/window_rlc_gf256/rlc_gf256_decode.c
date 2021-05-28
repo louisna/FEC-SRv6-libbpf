@@ -174,9 +174,6 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
     prng.tmat = 0x3793fdff;
 
     uint8_t *muls = rlc->muls;
-    // TODO: check again if we can recover ?
-    // plugins/fec-pquic/fec_scheme_protoops/rlc_fec_scheme_gf256.c
-    // line 140 to see how we should do it
 
     uint8_t effective_window_check = 0;
     uint32_t current_encodingSymbolID = encodingSymbolID;
@@ -189,7 +186,6 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
             ++effective_window_check;
             current_encodingSymbolID -= rlc_window_slide;
         } else {
-            //printf("WWhy %u? %u %u\n", i, current_encodingSymbolID, repairTLV->encodingSymbolID);
             break; // Gap in the repair symbols, we stop
         }
     }
@@ -197,16 +193,10 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
         printf("Snif\n");
         return -1;
     }
-    //printf("Current encodingSymbolID is: %d\n", encodingSymbolID);
-    //printf("Value of effective_window_check: %d\n", effective_window_check);
     uint8_t source_symbol_nb = (effective_window_check - 1) * rlc_window_slide + rlc_window_size;
-    /* Find all lost symbols in the last 3 windows if we have the repair symbol of the window */
+    // Find all lost symbols in the last 3 windows if we have the repair symbol of the window 
     uint8_t **source_symbols_array = malloc(source_symbol_nb * sizeof(uint8_t *)); // TODO: check malloc
     memset(source_symbols_array, 0, sizeof(uint8_t *) * source_symbol_nb);
-    /*for (int i = 0; i < source_symbol_nb; ++i) {
-        source_symbols_array[i] = malloc(MAX_PACKET_SIZE);
-        memset(source_symbols_array[i], 0, MAX_PACKET_SIZE);
-    }*/
     struct repairSymbol_t **repair_symbols_array = malloc(effective_window_check * sizeof(struct repairSymbol_t *)); // TODO: check malloc
     memset(repair_symbols_array, 0, sizeof(struct repairSymbol_t *) * effective_window_check);
     for (int i = 0; i < effective_window_check; ++i) {
@@ -226,43 +216,37 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
     uint32_t id_first_ss_first_window = encodingSymbolID - source_symbol_nb + 1;
     uint32_t id_first_rs_first_window = encodingSymbolID - (effective_window_check - 1) * rlc_window_slide;
 
-    /* Store the source and repair symbols in a new structure to merge US and KS */
+    // Store the source and repair symbols in a new structure to merge US and KS 
     for (int i = 0; i < effective_window_check; ++i) {
         uint32_t idx = (id_first_rs_first_window + rlc_window_slide * i) % RLC_RECEIVER_BUFFER_SIZE;
         memcpy(repair_symbols_array[i], &fecConvolution->windowInfoBuffer[idx].repairSymbol, sizeof(struct repairSymbol_t));
     }
     for (int i = 0; i < source_symbol_nb; ++i) {
         uint32_t idx = (id_first_ss_first_window + i) % RLC_RECEIVER_BUFFER_SIZE;
-        //printf("idx=%u, maxss=%u, i=%d, id first=%u\n", idx, source_symbol_nb, i, id_first_ss_first_window);
-        //printf("id first rs=%u, encodingSymbolID=%u\n", id_first_rs_first_window, encodingSymbolID);
         struct tlvSource__convo_t *tlv = (struct tlvSource__convo_t *)&fecConvolution->sourceRingBuffer[idx].tlv;
         uint32_t id_from_buffer = tlv->encodingSymbolID;
         uint32_t theoric_id = id_first_ss_first_window + i;
-        //printf("id buffer: %d, theoric id=%d\n", id_from_buffer, theoric_id);
         if (id_from_buffer == theoric_id && tlv->tlv_type != 0) {
             source_symbols_array[i] = malloc(decoding_size);
             memset(source_symbols_array[i], 0, decoding_size);
             memcpy(source_symbols_array[i], fecConvolution->sourceRingBuffer[idx].packet, fecConvolution->sourceRingBuffer[idx].packet_length);
             memcpy(source_symbols_array[i] + MAX_PACKET_SIZE, &fecConvolution->sourceRingBuffer[idx].packet_length, sizeof(uint16_t));
-            //printf("Source symbol #%d at index %d=%x\n", i, 137, source_symbols_array[i][137]);
         } else if (rlc->recoveredSources[idx] && rlc->recoveredSources[idx]->encodingSymbolID == theoric_id) {
             source_symbols_array[i] = malloc(decoding_size);
             memset(source_symbols_array[i], 0, decoding_size);
             memcpy(source_symbols_array[i], rlc->recoveredSources[idx]->packet, rlc->recoveredSources[idx]->packet_length);
             memcpy(source_symbols_array[i] + MAX_PACKET_SIZE, &rlc->recoveredSources[idx]->packet_length, sizeof(uint16_t));
         } else {
-            //printf("Symbol with id=%d is unknown apparently\n", id_first_ss_first_window + i);
             unknowns_idx[nb_unknowns] = i; // Store index of the lost packet (unknown for the equation system)
             missing_indexes[i] = nb_unknowns;
             ++nb_unknowns;
         }
     }
     if (nb_unknowns == 0) {
-        //printf("No need for recovery !");
         for (int i = 0; i < source_symbol_nb; ++i) {
             if (source_symbols_array[i]) free(source_symbols_array[i]);
         }
-        free (source_symbols_array);
+        free(source_symbols_array);
         for (int i = 0; i < effective_window_check; ++i) {
             free(repair_symbols_array[i]);
         }
@@ -272,10 +256,8 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
         free(protected_symbol);
         return 0;
     }
-    //printf("Number of unknowns: %d\n", nb_unknowns);
 
     // System is Ax=b
-
     int n_eq = MIN(nb_unknowns, effective_window_check);
     uint8_t *coefs = malloc(rlc_window_size); // changed
     memset(coefs, 0, rlc_window_size);
@@ -303,33 +285,18 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
 
     int i = 0;
 
-    /*tinymt32_t *shuffle_prng = malloc(sizeof(tinymt32_t));
-    shuffle_prng->mat1 = 0x8f7011ee;
-    shuffle_prng->mat2 = 0xfc78ff1f;
-    shuffle_prng->tmat = 0x3793fdff;
-    tinymt32_init(shuffle_prng, encodingSymbolID * 4 - 5*14); // TODO: change seed ?
-    shuffle repair symbols ?
-    */
-
-    /*for (int l = 0; l < MAX_PACKET_SIZE; ++l) {
-        printf("Valeur du repair symbol 0 a index %d=%x\n", l, repair_symbols_array[0]->packet[l]);
-    }*/
-
     for (int rs = 0; rs < effective_window_check; ++rs) {
         struct repairSymbol_t *repairSymbol = repair_symbols_array[rs];
         bool protect_at_least_one_ss = false;
         // Check if this repair symbol protects at least one lost source symbol
         for (int k = 0; k < rlc_window_size; ++k) {
             int idx = rs * rlc_window_slide + k;
-            //printf("Value of idx=%d\n", idx);
             if (!source_symbols_array[idx] && !protected_symbol[idx]) {
                 protect_at_least_one_ss = true;
                 protected_symbol[idx] = true;
-                //printf("Enter protects");
                 break;
             }
         }
-        //printf("protects at least one ? %d\n", protect_at_least_one_ss);
         if (protect_at_least_one_ss) {
             constant_terms[i] = malloc(decoding_size);
             if (!constant_terms[i]) return -1;
@@ -342,24 +309,16 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
             memset(system_coefs[i], 0, nb_unknowns);
             uint16_t repairKey = ((struct tlvRepair__convo_t *)&repairSymbol->tlv)->repairFecInfo & 0xffff;
             rlc__get_coefs(&prng, repairKey, rlc_window_size, coefs); // TODO: coefs specific ? line 454
-            //printf("repairKey is %d venant de %x\n", repairKey, ((struct tlvRepair__convo_t *)&repairSymbol->tlv)->repairFecInfo);
-            //struct tlvRepair__convo_t *tlv = ((struct tlvRepair__convo_t *)&repairSymbol->tlv);
-            //printf("Est-ce que j'ai bien le repair tlv ? tlv_type=%d, tlv_encoding=%d, fecInfo=%d\n", tlv->tlv_type, tlv->encodingSymbolID, tlv->repairFecInfo);
-            //for (int jj = 0; jj < rlc_window_size; ++jj) {
-            //    printf("Valeur du coef: %d\n", coefs[jj]);
-            //}
             int current_unknown = 0;
             for (int j = 0; j < rlc_window_size; ++j) {
                 int idx = rs * rlc_window_slide + j;
                 if (source_symbols_array[idx]) { // This protected source symbol is received
-                //printf("Source symbol #%d at index %d=%x with coef=%d\n", j, j, source_symbols_array[idx][142], coefs[j]);
                     symbol_sub_scaled(constant_terms[i], coefs[j], source_symbols_array[idx], decoding_size, muls);
                 } else if (current_unknown < nb_unknowns) {
                     if (missing_indexes[idx] != -1) {
                         system_coefs[i][missing_indexes[idx]] = coefs[j];
-                        //printf("Passage 5.3 avec coef=%d missing idx=%d\n", coefs[j], missing_indexes[idx]);
                     } else {
-                        printf("Erreur ici 3452\n");
+                        fprintf(stderr, "Erreur ici 3452\n");
                     }
                 }
             }
@@ -370,7 +329,6 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
     int n_effective_equations = i;
 
     bool can_recover = n_effective_equations >= nb_unknowns;
-    //printf("neffe eq=%d, nb_unknown=%d\n", n_effective_equations, nb_unknowns);
     if (can_recover) {
         gaussElimination(n_effective_equations, nb_unknowns, system_coefs, constant_terms, unknowns, undetermined, decoding_size, muls, rlc->table_inv);
     } else {
@@ -385,24 +343,15 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
             recoveredSource_t *recovered = malloc(sizeof(recoveredSource_t));
             memset(recovered, 0, sizeof(recoveredSource_t));
             recovered->encodingSymbolID = id_first_ss_first_window + idx;
-            // printf("Recovered packet with encodingSymbolID=%u\n", recovered->encodingSymbolID);
             memcpy(recovered->packet, unknowns[current_unknown], MAX_PACKET_SIZE);
             memcpy(&recovered->packet_length, unknowns[current_unknown] + MAX_PACKET_SIZE, sizeof(uint16_t));
-            //printf("Recovered packet from %u to %u\n", unknowns[current_unknown] + MAX_PACKET_SIZE, recovered->packet_length);
-
-            // TODO: get the length also
-            // TODO: send the packet
-            //print_recovered(recovered);
             ++total_recovered;
-            //printf("Recovered source symbols with ID=%u, total recovered=%d\n", recovered->encodingSymbolID, total_recovered);
             err = send_raw_socket_recovered(sfd, recovered, local_addr);
             if (err < 0) {
                 fprintf(stderr, "Error during sending the packet, drop\n");
                 free(recovered);
             } else {
-                //printf("Sent recovered packet\n");
-
-                /* Add the recovered packet in the recovered buffer */
+                // Add the recovered packet in the recovered buffer 
                 int bufferIdx = recovered->encodingSymbolID % RLC_RECEIVER_BUFFER_SIZE;
                 if (rlc->recoveredSources[bufferIdx]) free(rlc->recoveredSources[bufferIdx]);
                 rlc->recoveredSources[recovered->encodingSymbolID % RLC_RECEIVER_BUFFER_SIZE] = recovered;
@@ -411,7 +360,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
         free(unknowns[current_unknown++]);
     }
 
-    /* Free the system */
+    // Free the system 
     for (i = 0; i < n_eq; ++i) {
         free(system_coefs[i]);
         if (i < n_effective_equations) {
@@ -445,7 +394,7 @@ decode_rlc_t *initialize_rlc_decode() {
 
     memset(my_rlc, 0, sizeof(decode_rlc_t));
 
-    /* Create and fill the products */
+    // Create and fill the products 
     uint8_t *muls = malloc(256 * 256 * sizeof(uint8_t));
     if (!muls) {
         free(my_rlc);
@@ -459,7 +408,7 @@ decode_rlc_t *initialize_rlc_decode() {
     }
     my_rlc->muls = muls;
 
-    /* Create and set the inverse muls array */
+    // Create and set the inverse muls array 
     uint8_t *table_inv = malloc(256 * sizeof(uint8_t));
     if (!table_inv) {
         free(muls);

@@ -35,7 +35,7 @@ typedef struct {
 
 args_t plugin_arguments;
 
-/* Used to detect the end of the program */
+// Used to detect the end of the program
 static volatile int exiting = 0;
 
 static volatile int sfd = -1;
@@ -70,17 +70,11 @@ static void bump_memlock_rlimit(void)
     }
 }
 
-int globalCount = 0;
-
 static void send_recovered_symbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz) {
-    /* Get the repairSymbol
-     * ->packet: the decoded and recovered packet
-     * ->packet_length: the length of the recovered packet
-     */
+    // Get the repairSymbol
+    // ->packet: the decoded and recovered packet
+    // ->packet_length: the length of the recovered packet
     const struct repairSymbol_t *repairSymbol = (struct repairSymbol_t *)data;
-
-    ++globalCount;
-    if (globalCount % 1000 == 0) printf("CALL TRIGGERED!\n");
 
     send_raw_socket_recovered(sfd, repairSymbol, local_addr);
 }
@@ -95,7 +89,7 @@ static void controller(void *data) {
     }
 }
 
-static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
+static void fecScheme_RLC(void *ctx, int cpu, void *data, __u32 data_sz) {
     uint8_t *controller_message = (uint8_t *)data;
     if ((*controller_message) & 0x4) {
         // This is a controller message
@@ -105,24 +99,20 @@ static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
     // This is a recovering information
     fecConvolution_t *fecConvolution = (fecConvolution_t *)data;
 
-    ++globalCount;
-
-    if (globalCount % 10000 == 0) printf("Coucou\n");
-
-    /* Generate the repair symbol */
+    // Generate the repair symbol
     int err = rlc__fec_recover(fecConvolution, rlc, sfd, local_addr);
     if (err < 0) {
-        printf("ERROR. TODO: handle\n");
+        fprintf(stderr, "ERROR. TODO: handle\n");
     }
 }
 
 static void handle_events(int map_fd_events, enum fec_framework framework) {
-    /* Define structure for the perf event */
+    // Define structure for the perf event
     struct perf_buffer_opts pb_opts = {0};
     if (framework == BLOCK) {
         pb_opts.sample_cb = send_recovered_symbol_XOR;
     } else {
-        pb_opts.sample_cb = fecScheme;
+        pb_opts.sample_cb = fecScheme_RLC;
     }
     struct perf_buffer *pb = NULL;
     int err;
@@ -135,8 +125,8 @@ static void handle_events(int map_fd_events, enum fec_framework framework) {
         goto cleanup;
     }
 
-    /* Enter in loop until a signal is retrieved
-     * Poll the recovered packet from the BPF program */
+    // Enter in loop until a signal is retrieved
+    // Poll the recovered packet from the BPF program
     while (!exiting) {
         err = perf_buffer__poll(pb, 100);
         if (err < 0 && errno != EINTR) {
@@ -231,7 +221,7 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    /* Init the address structure for current node */
+    // Init the address structure for current node
     memset(&local_addr, 0, sizeof(local_addr));
     local_addr.sin6_family = AF_INET6;
     if (inet_pton(AF_INET6, plugin_arguments.decoder_ip, local_addr.sin6_addr.s6_addr) != 1) {
@@ -239,7 +229,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    /* Init the address structure for encoder */
+    // Init the address structure for encoder
     memset(&encoder, 0, sizeof(encoder));
     encoder.sin6_family = AF_INET6;
     if (inet_pton(AF_INET6, plugin_arguments.encoder_ip, encoder.sin6_addr.s6_addr) != 1) {
@@ -247,31 +237,31 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    /* Set up libbpf errors and debug info callback */
+    // Set up libbpf errors and debug info callback
     libbpf_set_print(libbpf_print_fn);
 
-    /* Bump RLIMIT_MEMLOCK to allow BPF sub-system to do anything :3 */
+    // Bump RLIMIT_MEMLOCK to allow BPF sub-system
     bump_memlock_rlimit();
 
-    /* Clean handling of Ctrl+C */
+    // Clean handling of Ctrl+C
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
 
-    /* Open BPF application */
+    // Open BPF application
     skel = decoder_bpf__open();
     if (!skel) {
         fprintf(stderr, "Failed to open BPF skeleton :(\n");
         return 1;
     }
 
-    /* Load and verify BPF program */
+    // Load and verify BPF program
     err = decoder_bpf__load(skel);
     if (err) {
         fprintf(stderr, "Failed to verify and load BPF skeleton :(\n");
         goto cleanup;
     }
 
-    /* Pin program object to attach it with iproute2 */
+    // Pin program object to attach it with iproute2
     bpf_object__pin(skel->obj, "/sys/fs/bpf/decoder");
 
     if (plugin_arguments.attach) {
@@ -284,7 +274,7 @@ int main(int argc, char **argv)
         system(attach_cmd);
     }
 
-    /* Get file descriptor of maps and init the value of the structures */
+    // Get file descriptor of maps and init the value of the structures
     struct bpf_map *map_xorBuffer = skel->maps.xorBuffer;
     int map_fd_xorBuffer = bpf_map__fd(map_xorBuffer);
     for (int i = 0; i < MAX_BLOCK; ++i) {
@@ -303,41 +293,39 @@ int main(int argc, char **argv)
     struct bpf_map *map_events = skel->maps.events;
     int map_fd_events = bpf_map__fd(map_events);
 
-    /* Open raw socket */
+    // Open raw socket
     sfd = socket(AF_INET6, SOCK_RAW, IPPROTO_RAW);
     if (sfd == -1) {
         perror("Cannot create socket");
         goto cleanup;
     }
 
-    /* Initialize structure for RLC */
+    // Initialize structure for RLC
     rlc = initialize_rlc_decode();
     if (!rlc) {
         perror("Cannot create RLC structure");
         goto cleanup;
     }
 
-    /* Enter perf event handling for packet recovering */
+    // Enter perf event handling for packet recovering
     handle_events(map_fd_events, plugin_arguments.framework);
 
-    /* Close socket */
+    // Close socket
     if (close(sfd) == -1) {
         perror("Cannot close socket");
         goto cleanup;
     }
 
-    printf("GLOBAL COUNT: %d\n", globalCount);
-
 cleanup:
     // We reach this point when we Ctrl+C with signal handling
-    /* Unpin the program and the maps to clean at exit */
+    // Unpin the program and the maps to clean at exit
     bpf_object__unpin_programs(skel->obj,  "/sys/fs/bpf/decoder");
     bpf_map__unpin(map_xorBuffer, "/sys/fs/bpf/decoder/xorBuffer");
     bpf_map__unpin(map_fecConvolutionBuffer, "/sys/fs/bpf/decoder/fecConvolutionInfoMap");
     // Do not know if I have to unpin the perf event too
     bpf_map__unpin(map_events, "/sys/fs/bpf/decoder/events");
     decoder_bpf__destroy(skel);
-    /* Free memory of the RLC structure */
+    // Free memory of the RLC structure
     free_rlc_decode(rlc);
 
     // Detach the program if we attached it

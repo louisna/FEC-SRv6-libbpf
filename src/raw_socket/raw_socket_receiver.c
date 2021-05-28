@@ -4,7 +4,6 @@ void compute_tcp_checksum(struct ip6_hdr *pIph, uint16_t *ipPayload, uint16_t tc
     register unsigned long sum = 0;
     int i;
     struct tcphdr *tcphdrp = (struct tcphdr *)(ipPayload);
-    //printf("Longueur tcp est=%u et sport=%x\n", tcpLen, tcphdrp->th_sport);
     //add the pseudo header 
     //the source ip
     struct in6_addr *src_addr = &pIph->ip6_src;
@@ -20,8 +19,6 @@ void compute_tcp_checksum(struct ip6_hdr *pIph, uint16_t *ipPayload, uint16_t tc
     sum += htons(IPPROTO_TCP);
     //the length
     sum += htons(tcpLen);
-
-    //printf("Passage 1\n");
  
     //add the IP payload
     //initialize checksum to 0
@@ -30,17 +27,14 @@ void compute_tcp_checksum(struct ip6_hdr *pIph, uint16_t *ipPayload, uint16_t tc
         sum += * ipPayload++;
         tcpLen -= 2;
     }
-    //printf("Passage 2\n");
     //if any bytes left, pad the bytes and add
     if(tcpLen > 0) {
-        //printf("+++++++++++padding, %dn", tcpLen);
         sum += ((*ipPayload)&htons(0xFF00));
     }
       //Fold 32-bit sum to 16 bits: add carrier to result
       while (sum>>16) {
           sum = (sum & 0xffff) + (sum >> 16);
       }
-      //printf("Passage 3\n");
       sum = ~sum;
     //set computation result
     tcphdrp->check = (uint16_t)sum;
@@ -84,24 +78,17 @@ void compute_udp_checksum(struct ip6_hdr *pIph, uint16_t *buf, uint16_t len) {
         sum = (sum & 0xFFFF) + (sum >> 16);
 
     /* Return the one's complement of sum */
-    //return((uint16_t)(~sum));
     udphdr->uh_sum = ((uint16_t)(~sum));
 }
 
 int send_raw_socket_recovered(int sfd, const void *repairSymbol_void, struct sockaddr_in6 local_addr) {
     const struct repairSymbol_t *repairSymbol = (const struct repairSymbol_t *)repairSymbol_void;
-    // struct sockaddr_in6 src;
     struct sockaddr_in6 dst;
     uint8_t packet[4200];
-    //fprintf(stderr, "Entering send raw socket\n");
     size_t packet_length;
     struct ip6_hdr *iphdr;
     struct ipv6_sr_hdr *srh;
-    // struct udphdr *uhdr;
     size_t ip6_length = 40;
-    // size_t srh_length = 0;
-    // size_t udp_length = 8;
-    // size_t pay_length = repairSymbol->packet_length;
     int next_segment_idx;
     int bytes; // Number of sent bytes
     int i;
@@ -120,15 +107,16 @@ int send_raw_socket_recovered(int sfd, const void *repairSymbol_void, struct soc
      * => we are given a const variable, but we will need to change some fields */
     memcpy(packet, repairSymbol->packet, repairSymbol->packet_length);
     packet_length = repairSymbol->packet_length;
-    //printf("Packet recovered of length: %ld\n", packet_length);
     
     /* Get pointer to the IPv6 header and Segment Routing header */
     iphdr = (struct ip6_hdr *)&packet[0];
     srh = (struct ipv6_sr_hdr *)&packet[ip6_length];
-    // srh_length = srh->hdrlen;
 
     /* Put new value of Hop Limit */
     iphdr->ip6_hops = 51;
+
+    // Remove possible ECN bits
+    iphdr->ip6_vfc &= 0b11111100;
 
     /* Retrieve the next segment after the current node to put as destination address.
      * Also need to update the Segment Routing header segment left entry */
@@ -145,9 +133,7 @@ int send_raw_socket_recovered(int sfd, const void *repairSymbol_void, struct soc
                 found_current_segment = 0;
                 break;
             }
-            //printf("%d :::: %d\n", current_seg.s6_addr[j], local_addr.sin6_addr.s6_addr[j]);
         }
-        //printf("------\n");
         if (found_current_segment) break;
     }
     if (!found_current_segment) { // Should not happen !
@@ -155,7 +141,6 @@ int send_raw_socket_recovered(int sfd, const void *repairSymbol_void, struct soc
         return -1; // TODO: maybe just use the last segment instead ?
     }
     next_segment_idx = i - 1;
-    //printf("Value of next_segment_idx: %d\n", next_segment_idx);
 
     /* Copy the address of the next segment in the Destination Address entry of the IPv6 header */
     memset(&dst, 0, sizeof(dst));
@@ -173,22 +158,13 @@ int send_raw_socket_recovered(int sfd, const void *repairSymbol_void, struct soc
         return -1;
     }
     if (srh->nexthdr == 6) { // TCP
-        //printf("SRH LEN=%u\n", srh_len);
-        //printf("Avant\n");
         struct tcphdr *tcp = (struct tcphdr *)&packet[ip6_length + srh_len];
-        //for (int i = 0; i < 32; ++i) {
-        //    printf("%x ", packet[ip6_length + srh_len + i]);
-        //}
-        //printf("\n");
-        //printf("Apres, avant calcul, le checksum vaut: %x\n", tcp->check);
         if (repairSymbol->packet_length < ip6_length + srh_len) {
             fprintf(stderr, "Erorr during the decoding, surely due to the 'multi threading' of the plugin\n");
             return -1;
         }
         uint16_t tcp_len = repairSymbol->packet_length - ip6_length - srh_len;
-        //printf("Valeur de tcp len:%u\n", tcp_len);
         compute_tcp_checksum(iphdr, (uint16_t *)tcp, tcp_len);
-        //printf("Apres, apres calcul, le checksum vaut: %x\n", tcp->check);
     } else if (srh->nexthdr == 17) { // UDP
         struct udphdr *udp = (struct udphdr *)&packet[ip6_length + srh_len];
         if (repairSymbol->packet_length < ip6_length + srh_len) {
@@ -198,9 +174,7 @@ int send_raw_socket_recovered(int sfd, const void *repairSymbol_void, struct soc
         // Reinit the previous checksum
         udp->uh_sum = 0;
         uint16_t udp_len = repairSymbol->packet_length - ip6_length - srh_len;
-        //printf("UDP length is: %u\n", udp_len);
         compute_udp_checksum(iphdr, (uint16_t *)udp, udp_len);
-        //printf("UDP checksum: %x\n", udp->uh_sum);
     }
 
     /* Send packet */

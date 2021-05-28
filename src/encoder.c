@@ -40,14 +40,13 @@ typedef struct {
 
 static volatile int sfd = -1;
 static volatile int first_sfd = 1;
-static uint64_t total = 0;
 
 static struct sockaddr_in6 src;
 static struct sockaddr_in6 dst;
 
 encode_rlc_t *rlc = NULL;
 
-/* Used to detect the end of the program */
+// Used to detect the end of the program
 static volatile bool exiting = 0;
 
 static void sig_handler(int sig) {
@@ -71,41 +70,29 @@ static void bump_memlock_rlimit(void) {
 }
 
 static void send_repairSymbol_XOR(void *ctx, int cpu, void *data, __u32 data_sz) {
-    /* Get the repairSymbol
-     * ->packet: the repair symbol
-     * ->packet_length: the length of the repair symbol
-     * ->tlv: the TLV to be added in the SRH header 
-     */
+    // Get the repairSymbol
+    // ->packet: the repair symbol
+    // ->packet_length: the length of the repair symbol
+    // ->tlv: the TLV to be added in the SRH header 
+     
     const struct repairSymbol_t *repairSymbol = (struct repairSymbol_t *)data;
-    if (total % 10000 == 0) printf("CALL TRIGGERED!\n");
-    //printf("Repair symbol of length: %u\n", repairSymbol->packet_length);
-    //printf("Information sur mon repair symbol: %u %u\n", repairSymbol->packet_length, repairSymbol->tlv[0]);
-    ++total;
     send_raw_socket(sfd, repairSymbol, src, dst);
 }
 
 static void fecScheme(void *ctx, int cpu, void *data, __u32 data_sz) {
     fecConvolution_user_t *fecConvolution = (fecConvolution_user_t *)data;
-    //printf("Call triggered: %d\n", fecConvolution->encodingSymbolID);
-    //printf("And the TLV value is: %u type=%u\n", fecConvolution->repairTlv[0].encodingSymbolID, fecConvolution->repairTlv[0].tlv_type);
-    /* Generate the repair symbol */
+    // Generate the repair symbol 
     int err = rlc__generate_repair_symbols(fecConvolution, rlc, sfd, &src, &dst);
     if (err < 0) {
         printf("ERROR. TODO: handle\n");
         return;
     }
 
-    /* Send the repair symbol */
-    //err = send_raw_socket(sfd, rlc->repairSymbol, src, dst);
-    //printf("%d", err);
-    //if (err < 0) {
-    //    perror("Impossible to send packet");
-    //}
     return;
 }
 
 static void handle_events(int map_fd_events, enum fec_framework framework) {
-    /* Define structure for the perf event */
+    // Define structure for the perf event 
     struct perf_buffer_opts pb_opts = {0};
     if (framework == BLOCK) {
         pb_opts.sample_cb = send_repairSymbol_XOR;
@@ -124,9 +111,9 @@ static void handle_events(int map_fd_events, enum fec_framework framework) {
         goto cleanup;
     }
 
-    /* Enter in loop until a signal is retrieved
-     * Poll the recovered packet from the BPF program
-     */
+    // Enter in loop until a signal is retrieved
+    // Poll the recovered packet from the BPF program
+     
     while (!exiting) {
         err = perf_buffer__poll(pb, 100);
         if (err < 0 && errno != EINTR) {
@@ -151,7 +138,7 @@ void usage(char *prog_name) {
     fprintf(stderr, "    -a attach: if set, attempts to attach the program to *encoder_ip*\n");
     fprintf(stderr, "    -i interface: the interface to which attach the program (if *attach* is set)\n");
     fprintf(stderr, "    -c controller_ip (default: fc00::b): activate the controller mechanism\n");
-    fprintf(stderr, "    -l update latency: the number of packets between two controller update (default: 1000)\n");
+    fprintf(stderr, "    -l update_latency: the number of packets between two controller update (default: 1000)\n");
     fprintf(stderr, "    -t threshold: controller threshold below which repair symbols are forwarded (default: 98)\n");
 }
 
@@ -168,7 +155,7 @@ int parse_args(args_t *args, int argc, char *argv[]) {
     strcpy(args->controller_ip, "fc00::b");
     args->controller = 1;
     args->controller_threshold = 98;
-    args->controller_update_every = 1000;
+    args->controller_update_every = 1024;
 
     bool interface_if_attach = false;
 
@@ -277,7 +264,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    /* IPv6 Source address */
+    // IPv6 Source address 
     memset(&src, 0, sizeof(src));
     src.sin6_family = AF_INET6;
     if (inet_pton(AF_INET6, plugin_arguments.encoder_ip, src.sin6_addr.s6_addr) != 1) {
@@ -285,7 +272,7 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    /* IPv6 Destination address */
+    // IPv6 Destination address 
     memset(&dst, 0, sizeof(dst));
 	dst.sin6_family = AF_INET6;
 	if (inet_pton(AF_INET6, plugin_arguments.decoder_ip, dst.sin6_addr.s6_addr) != 1) {
@@ -293,24 +280,24 @@ int main(int argc, char *argv[]) {
 		return -1;
 	}
 
-    /* Set up libbpf errors and debug info callback */
+    // Set up libbpf errors and debug info callback 
     libbpf_set_print(libbpf_print_fn);
 
-    /* Bump RLIMIT_MEMLOCK to allow BPF sub-system to do anything :3 */
+    // Bump RLIMIT_MEMLOCK to allow BPF sub-system to do anything :3 
     bump_memlock_rlimit();
 
-    /* Clean handling of Ctrl-C */
+    // Clean handling of Ctrl-C 
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
 
-    /* Open BPF application */
+    // Open BPF application 
     skel = encoder_bpf__open();
     if (!skel) {
         fprintf(stderr, "Failed to open BPF skeleton :(\n");
         return 1;
     }
 
-    /* Load and verify BPF program */
+    // Load and verify BPF program 
     err = encoder_bpf__load(skel);
     if (err) {
         fprintf(stderr, "Failed to verify and load BPF skeleton :(\n");
@@ -329,11 +316,10 @@ int main(int argc, char *argv[]) {
         system(attach_cmd);
 
         // Now the same for the controller
-        if (1) { // TODO !
+        if (plugin_arguments.controller == 3) { // TODO !
             memset(attach_cmd, 0, sizeof(char) * 200);
-            char *controller_str = "fc00::b"; // TODO
             sprintf(attach_cmd, "ip -6 route add %s encap seg6local action End.BPF endpoint fd /sys/fs/bpf/encoder/lwt_seg6local_controller section srv6_fec dev %s",
-            controller_str, plugin_arguments.interface);
+            plugin_arguments.controller_ip, plugin_arguments.interface);
             fprintf(stderr, "Command used to attach the controller: %s\n", attach_cmd);
             system(attach_cmd);
         }
@@ -342,7 +328,7 @@ int main(int argc, char *argv[]) {
 
     int k0 = 0;
 
-    /* Get file descriptor of maps and init the value of the structures */
+    // Get file descriptor of maps and init the value of the structures 
     struct bpf_map *map_fecBuffer = skel->maps.fecBuffer;
     int map_fd_fecBuffer = bpf_map__fd(map_fecBuffer);
     fecBlock_t block_init = {0};
@@ -363,24 +349,24 @@ int main(int argc, char *argv[]) {
     struct bpf_map *map_events = skel->maps.events;
     int map_fd_events = bpf_map__fd(map_events);
 
-    /* Open raw socket */
+    // Open raw socket 
     sfd = socket(AF_INET6, SOCK_RAW, IPPROTO_RAW);
 	if (sfd == -1) {
 		perror("Cannot create socket");
 		goto cleanup;
 	}
 
-    /* Initialize structure for RLC */
+    // Initialize structure for RLC 
     rlc = initialize_rlc();
     if (!rlc) {
         perror("Cannot create structure");
         goto cleanup;
     }
 
-    /* Enter perf event handling for packet recovering */
+    // Enter perf event handling for packet recovering 
     handle_events(map_fd_events, plugin_arguments.framework);
 
-    /* Close socket */
+    // Close socket 
     if (close(sfd) == -1) {
 		perror("Cannot close socket");
 		goto cleanup;
@@ -388,14 +374,14 @@ int main(int argc, char *argv[]) {
 
 cleanup:
     // We reach this point when we Ctrl+C with signal handling
-    /* Unpin the program and the maps to clean at exit */
+    // Unpin the program and the maps to clean at exit 
     bpf_object__unpin_programs(skel->obj, "/sys/fs/bpf/encoder");
     bpf_map__unpin(map_fecBuffer, "/sys/fs/bpf/encoder/fecBuffer");
     bpf_map__unpin(map_fecConvolutionBuffer, "/sys/fs/bpf/encoder/fecConvolutionInfoMap");
     // Do not know if I have to unpin the perf event too
     bpf_map__unpin(map_events, "/sys/fs/bpf/encoder/events");
     encoder_bpf__destroy(skel);
-    /* Free memory of the RLC structure */
+    // Free memory of the RLC structure 
     free_rlc(rlc);
 
     // Detach the program if we attached it
@@ -405,7 +391,7 @@ cleanup:
         fprintf(stderr, "Command used to detach: %s\n", detach_cmd);
         system(detach_cmd);
 
-        if (1) { // TODO
+        if (plugin_arguments.controller == 3) { // TODO
         sprintf(detach_cmd, "ip -6 route del fc00::b");
         fprintf(stderr, "Command used to detach controller: %s\n", detach_cmd);
         system(detach_cmd);

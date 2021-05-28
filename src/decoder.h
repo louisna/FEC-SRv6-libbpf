@@ -10,7 +10,6 @@
 
 #define MAX_BLOCK 5
 
-/* Structures */
 struct sourceSymbol_t {
     __u8 packet[MAX_PACKET_SIZE];
     __u16 packet_length;
@@ -19,7 +18,7 @@ struct sourceSymbol_t {
 
 struct repairSymbol_t {
     __u8 packet[MAX_PACKET_SIZE];
-    __u16 packet_length; // TODO: change to unsigned short ?
+    __u16 packet_length;
     struct tlvRepair__block_t tlv;
 };
 
@@ -51,7 +50,7 @@ typedef struct {
     __u8 ringBuffSize; // Number of packets for next coding in the ring buffer
     struct sourceSymbol_t sourceRingBuffer[RLC_RECEIVER_BUFFER_SIZE];
     window_info_t windowInfoBuffer[RLC_RECEIVER_BUFFER_SIZE];
-    /* Controller values */
+    // Controller values
     __u32 most_recent_encodingSymbolID;
     __u32 last_encodingSymbolID; // Of the previous update
     __u16 received_counter;

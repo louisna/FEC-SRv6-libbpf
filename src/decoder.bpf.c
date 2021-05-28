@@ -13,7 +13,7 @@
 #include "fec_framework/window_receiver.c"
 #include "fec_framework/block_receiver.c"
 
-/* Perf even buffer */
+// Perf even buffer 
 struct {
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
     __uint(key_size, sizeof(__u32));
@@ -22,39 +22,36 @@ struct {
 
 SEC("lwt_seg6local_convo")
 int decode_convo(struct __sk_buff *skb) {
-    //if (DEBUG) bpf_printk("Receiver: BPF triggered from packet with SRv6!\n");
     int err;
     int k = 0;
 
-    /* First check if the packet can be protected in term of size 
-     * The packet is not dropped, just not protected */
+    // First check if the packet can be protected in term of size 
+    // The packet is not dropped, just not protected
     if (skb->len > MAX_PACKET_SIZE) {
-        bpf_printk("Packet too big, cannot protect: %u\n", skb->len);
+        //bpf_printk("Packet too big, cannot protect: %u\n", skb->len);
         return BPF_OK;
     }
     
-    /* Get the Segment Routing Header of the packet */
+    // Get the Segment Routing Header of the packet
     struct ip6_srh_t *srh = seg6_get_srh(skb);
     if (!srh) {
         if (DEBUG) bpf_printk("Receiver: impossible to get the SRH\n");
         return BPF_ERROR;
     }
 
-    /* Get the TLV from the SRH */
+    // Get the TLV from the SRH 
     __u8 tlv_type = 0; // Know whether the packet is a source or a repair symbol
     long cursor = seg6_find_tlv2(skb, srh, &tlv_type, sizeof(struct tlvSource__block_t), sizeof(struct tlvRepair__block_t));
     if (cursor < 0) {
-        if (DEBUG) bpf_printk("Receiver: impossible to get the TLV\n");
+        //if (DEBUG) bpf_printk("Receiver: impossible to get the TLV\n");
         return BPF_ERROR;
     }
     if (tlv_type != TLV_CODING_SOURCE && tlv_type != TLV_CODING_REPAIR) { // Should not enter in this condition
-        if (DEBUG) bpf_printk("Receiver: does not contain a source/repair TLV\n");
+        //if (DEBUG) bpf_printk("Receiver: does not contain a source/repair TLV\n");
         return BPF_ERROR;
     }
 
-    //xorStruct_t *xorStruct = 0;
-
-    /* Call FEC framework depending on the type of packet */
+    // Call FEC framework depending on the type of packet 
     if (tlv_type == TLV_CODING_SOURCE) {
         err = receiveSourceSymbol__convolution(skb, srh, cursor, &events);
     } else {
@@ -62,11 +59,11 @@ int decode_convo(struct __sk_buff *skb) {
     }
 
     if (err < 0) {
-        bpf_printk("Receiver: error confirmed\n");
+        //bpf_printk("Receiver: error confirmed\n");
         return BPF_ERROR;
     }
 
-    /* The repair symbol(s) must be dropped because not useful for the rest of the network */
+    // The repair symbol(s) must be dropped because not useful for the rest of the network 
     if (tlv_type == TLV_CODING_REPAIR) {
         return BPF_DROP;
     }
@@ -77,37 +74,36 @@ int decode_convo(struct __sk_buff *skb) {
 
 SEC("lwt_seg6local_block")
 int decode_block(struct __sk_buff *skb) {
-    //if (DEBUG) bpf_printk("Receiver: BPF triggered from packet with SRv6!\n");
     int err;
     int k = 0;
 
-    /* First check if the packet can be protected in term of size 
-     * The packet is not dropped, just not protected */
+    // First check if the packet can be protected in term of size 
+    // The packet is not dropped, just not protected 
     if (skb->len > MAX_PACKET_SIZE) {
-        if (DEBUG) bpf_printk("Packet too big, cannot protect\n");
+        //if (DEBUG) bpf_printk("Packet too big, cannot protect\n");
         return BPF_OK;
     }
     
-    /* Get the Segment Routing Header of the packet */
+    // Get the Segment Routing Header of the packet 
     struct ip6_srh_t *srh = seg6_get_srh(skb);
     if (!srh) {
-        if (DEBUG) bpf_printk("Receiver: impossible to get the SRH\n");
+        //if (DEBUG) bpf_printk("Receiver: impossible to get the SRH\n");
         return BPF_ERROR;
     }
 
-    /* Get the TLV from the SRH */
+    // Get the TLV from the SRH 
     __u8 tlv_type = 0; // Know whether the packet is a source or a repair symbol
     long cursor = seg6_find_tlv2(skb, srh, &tlv_type, sizeof(struct tlvSource__block_t), sizeof(struct tlvRepair__block_t));
     if (cursor < 0) {
-        if (DEBUG) bpf_printk("Receiver: impossible to get the TLV\n");
+        //if (DEBUG) bpf_printk("Receiver: impossible to get the TLV\n");
         return BPF_ERROR;
     }
     if (tlv_type != TLV_CODING_SOURCE && tlv_type != TLV_CODING_REPAIR) { // Should not enter in this condition
-        if (DEBUG) bpf_printk("Receiver: does not contain a source/repair TLV\n");
+        //if (DEBUG) bpf_printk("Receiver: does not contain a source/repair TLV\n");
         return BPF_ERROR;
     }
 
-    /* Call FEC framework depending on the type of packet */
+    // Call FEC framework depending on the type of packet 
     if (tlv_type == TLV_CODING_SOURCE) {
         err = receiveSourceSymbol__block(skb, srh, cursor, &events);
     } else {
@@ -115,16 +111,16 @@ int decode_block(struct __sk_buff *skb) {
     }
 
     if (err < 0) {
-        bpf_printk("Receiver: error confirmed\n");
+        //bpf_printk("Receiver: error confirmed\n");
         return BPF_ERROR;
     }
 
-    /* The repair symbol(s) must be dropped because not useful for the rest of the network */
+    // The repair symbol(s) must be dropped because not useful for the rest of the network 
     if (tlv_type == TLV_CODING_REPAIR) {
         return BPF_DROP;
     }
 
-    if (DEBUG) bpf_printk("Receiver: done FEC\n");
+    //if (DEBUG) bpf_printk("Receiver: done FEC\n");
     return BPF_OK;
 }
 
