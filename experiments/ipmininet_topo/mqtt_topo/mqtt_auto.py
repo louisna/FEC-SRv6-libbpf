@@ -64,9 +64,11 @@ try:
     
     i = 0
     # Start loop for every sample of the Markov model
+    output_file = f"testons/mqtt_run_{i}.json"  # SIGCOMM: put here the output directory
+    with open(output_file, "a+") as fd:
+        fd.write("[")
     for k in [99, 98, 97, 96, 95, 94, 93, 92, 91, 90]:
         for d in np.arange(0, 51, 2):
-            output_file = f"testons/mqtt_run_{k}_{d}_{i}.json"  # SIGCOMM: put here the output directory
             with open(output_file, "a+") as fd:
                 fd.write("[")
                 for run in range(3):
@@ -77,7 +79,7 @@ try:
                 
                     # Start dropper
                     # SIGCOMM: adapt to find the file
-                    dropper = net["rD"].pexec(f"python3 attach_markov.py --ips 204200dd00000000,0000000000000001,fc00000000000000,0000000000000009 --attach rD-eth2 --attach-ingress -k {k} -d {d} --no-update")
+                    dropper = net["rD"].pexec(f"python3 /vagrant/ebpf_dropper/attach_markov.py --ips 204200dd00000000,0000000000000001,fc00000000000000,0000000000000009 --attach rD-eth1 --attach-ingress -k {k} -d {d} --no-update")
                     print(dropper)
 
                     # Wait for the plugins and dropper to start
@@ -89,13 +91,19 @@ try:
                     # Start benchmark in main thread
                     out = net["hA"].pexec(f"/home/vagrant/go/bin/mqtt-benchmark --broker tcp://[2042:dd::1]:1883 --clients 10 --count 100 --format json >> {output_file}")
                     fd.write(out[0])
+                    
                     # Stop all running process before next iteration
                     encoder.terminate()
                     decoder.terminate()
                     tcpdump.terminate()
                     net["rD"].pexec("python3 attach_markov.py --ips 204200dd00000000,0000000000000001,fc00000000000000,0000000000000009 --attach rD-eth1 --attach-ingress --no-update --clean")
                     if run < 2: fd.write(",")
+                    i += 1
                 fd.write("]")
+                if i < 259: fd.write(",")
+        with open(output_file, "a+") as fd:
+            fd.write("]")
+    
 finally:
     net["rD"].terminate()
     net.stop()
