@@ -338,7 +338,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
     
     int current_unknown = 0;
     int err = 0;
-    /*for (int j = 0; j < nb_unknowns; ++j) {
+    for (int j = 0; j < nb_unknowns; ++j) {
         int idx = unknowns_idx[j];
         if (can_recover && !source_symbols_array[idx] && !undetermined[current_unknown] && !symbol_is_zero(unknowns[current_unknown], MAX_PACKET_SIZE)) {
             recoveredSource_t *recovered = malloc(sizeof(recoveredSource_t));
@@ -359,7 +359,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
             }
         }
         free(unknowns[current_unknown++]);
-    }*/
+    }
 
     // Free the system 
     for (i = 0; i < n_eq; ++i) {
