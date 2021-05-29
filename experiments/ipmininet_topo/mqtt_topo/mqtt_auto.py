@@ -1,7 +1,6 @@
 from ipmininet.iptopo import IPTopo
 from ipmininet.srv6 import enable_srv6
 from ipmininet.ipnet import IPNet
-from ipmininet.cli import IPCLI
 import time
 import numpy as np
 import os
@@ -67,7 +66,7 @@ try:
     # Start loop for every sample of the Markov model
     for k in [99, 98, 97, 96, 95, 94, 93, 92, 91, 90]:
         for d in np.arange(0, 51, 2):
-            output_file = f"testons/mqtt_run_{k}_{d}_{i}.json"
+            output_file = f"testons/mqtt_run_{k}_{d}_{i}.json"  # SIGCOMM: put here the output directory
             with open(output_file, "a+") as fd:
                 fd.write("[")
                 for run in range(3):
@@ -77,6 +76,7 @@ try:
                     decoder = net["rD"].popen("../../../src/decoder -a -i rD-eth0")
                 
                     # Start dropper
+                    # SIGCOMM: adapt to find the file
                     dropper = net["rD"].pexec(f"python3 attach_markov.py --ips 204200dd00000000,0000000000000001,fc00000000000000,0000000000000009 --attach rD-eth2 --attach-ingress -k {k} -d {d} --no-update")
                     print(dropper)
 
@@ -84,10 +84,9 @@ try:
                     time.sleep(2)
 
                     # Start tcpdump to listen to the packets
-                    tcpdump = net["rD"].popen("tcpdump -i rD-eth1 -w /vagrant/cap.pcap")
+                    tcpdump = net["rD"].popen("tcpdump -i rD-eth1 -w /vagrant/cap.pcap")  # SIGCOMM: put here the output file of tcpdump
 
                     # Start benchmark in main thread
-                    # out = net["hA"].pexec("python3 run_benchmark.py")
                     out = net["hA"].pexec(f"/home/vagrant/go/bin/mqtt-benchmark --broker tcp://[2042:dd::1]:1883 --clients 10 --count 100 --format json >> {output_file}")
                     fd.write(out[0])
                     # Stop all running process before next iteration
