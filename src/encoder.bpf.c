@@ -26,7 +26,7 @@ int srv6_fec_encode_convo(struct __sk_buff *skb)
     // First check if the packet can be protected in term of size 
     // The packet is not dropped, just not protected 
     if (skb->len > MAX_PACKET_SIZE) {
-        //if (DEBUG) bpf_printk("Packet too big, cannot protect\n");
+        //bpf_printk("Packet too big, cannot protect\n");
         return BPF_OK;
     }
 

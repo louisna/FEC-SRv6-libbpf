@@ -10,17 +10,17 @@
 
 #define MAX_BLOCK 5
 
-struct sourceSymbol_t {
+typedef struct sourceSymbol_t {
     __u8 packet[MAX_PACKET_SIZE];
     __u16 packet_length;
     struct tlvSource__block_t tlv;
-} BPF_PACKET_HEADER;
+} source_symbol_t;
 
-struct repairSymbol_t {
+typedef struct repairSymbol_t {
     __u8 packet[MAX_PACKET_SIZE];
     __u16 packet_length;
     struct tlvRepair__block_t tlv;
-};
+} repair_symbol_t;
 
 struct sourceBlock_t {
     __u16 blockID;

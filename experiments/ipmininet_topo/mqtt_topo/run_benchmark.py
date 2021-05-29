@@ -86,7 +86,7 @@ for i in range(1):
     #os.system(f"echo ] >> {output_dir}")
 
     # Notify the dropper that we can update the parameters for the next state
-    pkt = craft_srv6_packet(scapy_args, "zzzzzzzzzzz")
+    #pkt = craft_srv6_packet(scapy_args, "zzzzzzzzzzz")
     #send(pkt)
-    print("Sent update packet !")
+    #print("Sent update packet !")
     time.sleep(0.1)

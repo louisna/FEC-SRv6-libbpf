@@ -9,16 +9,16 @@
 #define RLC_BUFFER_SIZE MAX_RLC_WINDOW_SIZE
 #define RLC_RS_NUMBER 1
 
-struct sourceSymbol_t {
+typedef struct sourceSymbol_t {
     __u8 packet[MAX_PACKET_SIZE];
     __u16 packet_length;
-};
+} source_symbol_t;
 
-struct repairSymbol_t {
+typedef struct repairSymbol_t {
     __u8 tlv[sizeof(struct tlvRepair__block_t)];
     __u8 packet[MAX_PACKET_SIZE];
     __u16 packet_length;
-};
+} repair_symbol_t;
 
 typedef struct {
     __u16 soubleBlock;
