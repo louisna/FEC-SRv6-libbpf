@@ -121,7 +121,7 @@ int send_raw_socket_recovered(int sfd, const void *repairSymbol_void, struct soc
     /* Retrieve the next segment after the current node to put as destination address.
      * Also need to update the Segment Routing header segment left entry */
     bool found_current_segment;
-    if (srh->first_segment * 16 > sizeof(packet)) {
+    if (srh->first_segment * 16 > sizeof(packet) || srh->first_segment > 255) {
         fprintf(stderr, "I think the packet is wrongly decoded 1...\n");
         return -1;
     }
@@ -153,10 +153,11 @@ int send_raw_socket_recovered(int sfd, const void *repairSymbol_void, struct soc
 
     /* Compute the Checksum for IP for now */
     size_t srh_len = 8 + (srh->hdrlen << 3);
-    if (srh_len > sizeof(packet)) {
+    if (srh_len + ip6_length > sizeof(packet)) {
         fprintf(stderr, "I think the packet is wrongly decoded 2...\n");
         return -1;
     }
+    if (repairSymbol->packet_length + ip6_length + srh_len > sizeof(packet)) return -1;
     if (srh->nexthdr == 6) { // TCP
         struct tcphdr *tcp = (struct tcphdr *)&packet[ip6_length + srh_len];
         if (repairSymbol->packet_length < ip6_length + srh_len) {

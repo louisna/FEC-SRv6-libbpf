@@ -141,7 +141,6 @@ static __always_inline int receiveRepairSymbol__convolution(struct __sk_buff *sk
     // Get information about the source symbol
     __u32 encodingSymbolID = tlv.encodingSymbolID;
     if (encodingSymbolID < 0) {
-        // bpf_printk("Double lol ?\n");
         return -1;
     }
     __u8 windowSize = tlv.nss;

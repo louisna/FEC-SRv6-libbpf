@@ -54,6 +54,19 @@ static int rlc__generate_a_repair_symbol(fecConvolution_user_t *fecConvolution, 
         symbol_add_scaled(repairSymbol->packet, coefs[i], sourceSymbol->packet, sourceSymbol->packet_length, rlc->muls);
         symbol_add_scaled(&coded_length, coefs[i], &sourceSymbol->packet_length, sizeof(uint16_t), rlc->muls);
     }
+
+    //printf("Encoding symbol ID: %x\n", encodingSymbolID);
+    /*printf("Packet 1:\n");
+    for (int i = 0; i < MAX_PACKET_SIZE; ++i) {
+        uint8_t sourceBufferIndex = (encodingSymbolID - windowSize + 0 + 1) % windowSize;
+        printf("%x ", fecConvolution->sourceRingBuffer[sourceBufferIndex].packet[i]);
+    }
+    printf("\nSecond\n");
+    for (int i = 0; i < MAX_PACKET_SIZE; ++i) {
+        uint8_t sourceBufferIndex = (encodingSymbolID - windowSize + 1 + 1) % windowSize;
+        printf("%x ", fecConvolution->sourceRingBuffer[sourceBufferIndex].packet[i]);
+    }
+    printf("\n");*/
     
     // Now add and complete the TLV
     memcpy(&repairSymbol->tlv, tlv, sizeof(struct tlvRepair__convo_t));

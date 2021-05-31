@@ -37,7 +37,7 @@ static __always_inline int storePacket_decode(struct __sk_buff *skb, struct sour
     if (ipv6_offset < 0 || ipv6_offset > MAX_PACKET_SIZE) return -1;
 
     // Load the payload of the packet and store it in sourceSymbol
-    err = bpf_skb_load_bytes(skb, ipv6_offset, (void *)sourceSymbol->packet, ((skb->len - ipv6_offset - 1) & 0x1ff) + 1);
+    err = bpf_skb_load_bytes(skb, ipv6_offset, (void *)sourceSymbol->packet, ((skb->len - ipv6_offset - 1) & (MAX_PACKET_SIZE - 1)) + 1);
     if (err < 0) {
         // if (DEBUG) bpf_printk("Receiver: impossible to load bytes from packet\n");
         return -1;

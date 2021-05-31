@@ -6,7 +6,7 @@
 #define BPF_ERROR BPF_OK  // Choose action when an error occurs in the process
 #define DEBUG 0
 
-#define RLC_RECEIVER_BUFFER_SIZE 16
+#define RLC_RECEIVER_BUFFER_SIZE 32
 
 #define MAX_BLOCK 5
 

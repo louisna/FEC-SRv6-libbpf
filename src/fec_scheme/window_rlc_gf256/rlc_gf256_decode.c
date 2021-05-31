@@ -5,15 +5,16 @@
 #include "../../raw_socket/raw_socket_receiver.h"
 
 #define MIN(a, b) ((a < b) ? a : b)
+#define MAX(a, b) ((a > b) ? a : b)
 #define MAX_WINDOW_CHECK 5
 #define LOOP for(int ____i = 0; ____i < 1000; ____i++) {}
 
 void print_recovered(recoveredSource_t *recoveredPacket) {
     uint8_t *packet = recoveredPacket->packet;
     for (int i = 0; i < 158; ++i) {
-        printf("idx=%d    val=%u\n", i, packet[i]);
+        printf("%x ", packet[i]);
     }
-    printf("\n\n");
+    printf("\n");
 }
 
 void swap(uint8_t **a, int i, int j) {
@@ -172,6 +173,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
     prng.mat1 = 0x8f7011ee;
     prng.mat2 = 0xfc78ff1f;
     prng.tmat = 0x3793fdff;
+    uint16_t max_seen_payload_length = 0;
 
     uint8_t *muls = rlc->muls;
 
@@ -180,13 +182,14 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
     for (int i = 0; i < MAX_WINDOW_CHECK; ++i) {
         window_info_t *window_info = &fecConvolution->windowInfoBuffer[current_encodingSymbolID % RLC_RECEIVER_BUFFER_SIZE];
         struct tlvRepair__convo_t *repairTLV = (struct tlvRepair__convo_t *)&window_info->repairSymbol.tlv;
+        max_seen_payload_length = MAX(max_seen_payload_length, window_info->repairSymbol.packet_length);
         if (current_encodingSymbolID == repairTLV->encodingSymbolID) {
             rlc_window_size = repairTLV->nss; // Assumes that these two values will always be the same
             rlc_window_slide = (repairTLV->repairFecInfo >> 16) & 0xf; // DT in the 8 highest order bits
             ++effective_window_check;
             current_encodingSymbolID -= rlc_window_slide;
         } else {
-            printf("%u %u\n", current_encodingSymbolID, repairTLV->encodingSymbolID);
+            //printf("%u %u\n", current_encodingSymbolID, repairTLV->encodingSymbolID);
             break; // Gap in the repair symbols, we stop
         }
     }
@@ -346,10 +349,66 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
             recovered->encodingSymbolID = id_first_ss_first_window + idx;
             memcpy(recovered->packet, unknowns[current_unknown], MAX_PACKET_SIZE);
             memcpy(&recovered->packet_length, unknowns[current_unknown] + MAX_PACKET_SIZE, sizeof(uint16_t));
+            if (recovered->packet_length > max_seen_payload_length) {
+                free(recovered);
+                fprintf(stderr, "sisi\n");
+                continue;
+            }
+            //printf("length %u\n", recovered->packet_length);
             ++total_recovered;
             err = send_raw_socket_recovered(sfd, recovered, local_addr);
             if (err < 0) {
-                fprintf(stderr, "Error during sending the packet, drop\n");
+                fprintf(stderr, "VALEUR DE l'ENCODING SYMBOLID: %x\n", recovered->encodingSymbolID);
+                /*fprintf(stderr, "Error during sending the packet, drop\n");
+                printf("Valeur des coefs: ");
+                rlc__get_coefs(&prng, 0, rlc_window_size, coefs);
+                for (int l = 0; l < 4; l++) {
+                    printf("%u ", coefs[l]);
+                }
+                printf("\n");
+                printf("source symbol nb: %u\n", source_symbol_nb);
+                printf("first ss: %x\n", id_first_ss_first_window);
+                printf("first rs: %x\n", id_first_rs_first_window);
+                printf("Unknown idx:\n");
+                for (int l = 0; l < source_symbol_nb; ++l) {
+                    printf("%u ", unknowns_idx[l]);
+                }
+                printf("\n");
+                printf("missing idx:\n");
+                for (int l = 0; l < source_symbol_nb; ++l) {
+                    printf("%u ", missing_indexes[l]);
+                }
+                printf("\n");
+                //print_recovered(recovered);
+                printf("VALEUR DE l'ENCODING SYMBOLID: %x\n", recovered->encodingSymbolID);
+                printf("Montre tout le contenu du buffer:\n");
+                for (int l = 0; l < RLC_RECEIVER_BUFFER_SIZE; ++l) {
+                    struct tlvSource__convo_t *tlv = (struct tlvSource__convo_t *)&fecConvolution->sourceRingBuffer[l].tlv;
+                    printf("%x(%u) ", tlv->encodingSymbolID, fecConvolution->sourceRingBuffer[l].packet_length);
+                }
+                printf("\n");
+                printf("Now the repair symbols:\n");
+                for (int l = 0; l < RLC_RECEIVER_BUFFER_SIZE; ++l) {
+                    window_info_t *window_info = &fecConvolution->windowInfoBuffer[l];
+                    struct tlvRepair__convo_t *repairTLV = (struct tlvRepair__convo_t *)&window_info->repairSymbol.tlv;
+                    printf("%x(%u) ", repairTLV->encodingSymbolID, fecConvolution->windowInfoBuffer[l].repairSymbol.packet_length);
+                }
+                printf("La length recovered est: %u\n", recovered->packet_length);
+                printf("effective window check=%u, nb_unknowns=%u\n", effective_window_check, nb_unknowns);
+
+                printf("Repair symbol:\n");
+                for (int l = 0; l < 512; ++l) {
+                    printf("%x ", fecConvolution->windowInfoBuffer[(recovered->encodingSymbolID + 1) % 32].repairSymbol.packet[l]);
+                }
+                printf("\nDeuxieme symbol:\n");
+                struct tlvSource__convo_t *tlv = (struct tlvSource__convo_t *)&fecConvolution->sourceRingBuffer[(recovered->encodingSymbolID + 1) % 32].tlv;
+                printf("%x(%u) ", tlv->encodingSymbolID, fecConvolution->sourceRingBuffer[(recovered->encodingSymbolID + 1) % 32].packet_length);
+                for (int l = 0; l < 512; ++l) {
+                    printf("%x ", fecConvolution->sourceRingBuffer[(recovered->encodingSymbolID + 1) % 32].packet[l]);
+                }
+
+                printf("\n\n");
+                // print_recovered(recovered);*/
                 free(recovered);
             } else {
                 // Add the recovered packet in the recovered buffer 
