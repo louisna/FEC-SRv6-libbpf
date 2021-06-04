@@ -161,8 +161,6 @@ void gaussElimination(int n_eq, int n_unknowns, uint8_t **a, uint8_t *constant_t
     }
 }
 
-static int total_recovered = 0;
-
 static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc, int sfd, struct sockaddr_in6 local_addr) {
     // ID of the last received repair symbol
     uint32_t encodingSymbolID = fecConvolution->encodingSymbolID;
@@ -355,10 +353,11 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
                 continue;
             }
             //printf("length %u\n", recovered->packet_length);
-            ++total_recovered;
+            //++total_recovered;
+            //printf("Recovered 1\n");
             err = send_raw_socket_recovered(sfd, recovered, local_addr);
             if (err < 0) {
-                fprintf(stderr, "VALEUR DE l'ENCODING SYMBOLID: %x\n", recovered->encodingSymbolID);
+                //fprintf(stderr, "VALEUR DE l'ENCODING SYMBOLID: %x\n", recovered->encodingSymbolID);
                 /*fprintf(stderr, "Error during sending the packet, drop\n");
                 printf("Valeur des coefs: ");
                 rlc__get_coefs(&prng, 0, rlc_window_size, coefs);
@@ -419,6 +418,7 @@ static int rlc__fec_recover(fecConvolution_t *fecConvolution, decode_rlc_t *rlc,
         }
         free(unknowns[current_unknown++]);
     }
+    //printf("Total recovered: %u\n", total_recovered);
 
     // Free the system 
     for (i = 0; i < n_eq; ++i) {
