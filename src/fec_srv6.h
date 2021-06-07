@@ -22,7 +22,7 @@
 
 #define BPF_PACKET_HEADER __attribute__((packed))
 
-/* Block FEC Framework */
+// Block FEC Framework
 #define MAX_BLOCK_SIZE 10
 
 struct tlvSource__block_t {
@@ -45,7 +45,7 @@ struct tlvRepair__block_t {
     __u8 nrs; // Number of Repair Symbols
 } BPF_PACKET_HEADER;
 
-/* Convolutional FEC FRamework */
+// Convolutional FEC FRamework
 #define MAX_RLC_WINDOW_SIZE 16
 #define MAX_RLC_WINDOW_SLIDE 5
 #define MAX_RLC_REPAIR_GEN 8
@@ -68,7 +68,7 @@ struct tlvRepair__convo_t {
     __u8 nrs;
 } BPF_PACKET_HEADER;
 
-/* Controller */
+// Controller
 typedef struct {
     __u8 tlv_type;
     __u8 len;

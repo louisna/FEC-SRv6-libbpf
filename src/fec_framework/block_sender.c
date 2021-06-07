@@ -23,20 +23,19 @@ struct {
 static __always_inline int fecFramework__block(struct __sk_buff *skb, void *csh_void, fecBlock_t *mapStruct, void *map) {
     int err;
 
-    /* Load the source symbol structure to store the packet */
+    // Load the source symbol structure to store the packet
     struct sourceSymbol_t *sourceSymbol = &mapStruct->sourceSymbol;
     __u64 *ss64 = (__u64 *)sourceSymbol->packet;
     for (int i = 0; i < MAX_PACKET_SIZE / 8; ++i) {
         ss64[i] = 0;
     }
 
-    /* Store source symbol */
     err = storePacket(skb, sourceSymbol);
     if (err < 0) {
-        if (DEBUG) bpf_printk("Sender: error confirmed from storePacket\n");
+        // if (DEBUG) bpf_printk("Sender: error confirmed from storePacket\n");
         return -1;
     } else if (err == 1) { // Cannot protect the packet because too big size
-        if (DEBUG) bpf_printk("Sender: too big packet confirmed\n");
+        // if (DEBUG) bpf_printk("Sender: too big packet confirmed\n");
         return -1;
     }
 
@@ -47,7 +46,7 @@ static __always_inline int fecFramework__block(struct __sk_buff *skb, void *csh_
 
     struct tlvSource__block_t *csh = (struct tlvSource__block_t *)csh_void;
     
-    /* Complete the source symbol TLV */
+    // Complete the source symbol TLV
     memset(csh, 0, sizeof(struct tlvSource__block_t));
     csh->tlv_type = TLV_CODING_SOURCE;
     csh->len = sizeof(struct tlvSource__block_t) - 2; // Does not include tlv_type and len
@@ -63,23 +62,23 @@ static __always_inline int fecFramework__block(struct __sk_buff *skb, void *csh_
 
     bpf_spin_unlock(&mapStruct->lock);
 
-    /* Call coding function. This function:
-     * 1) Stores the source symbol for coding (or directly codes if XOR-on-the-line)
-     * 2) Creates the repair symbols TLV if needed
-     * 3) Returns: 1 to notify that repair symbols must be sent, 
-     *            -1 in case of error,
-     *             2 if the packet cannot be protected,
-     *             0 otherwise */
+    // Call coding function. This function:
+    // 1) Stores the source symbol for coding (or directly codes if XOR-on-the-line)
+    // 2) Creates the repair symbols TLV if needed
+    // 3) Returns: 1 to notify that repair symbols must be sent, 
+    //            -1 in case of error,
+    //             2 if the packet cannot be protected,
+    //             0 otherwise
     err = fecScheme__blockXOR(skb, mapStruct, sourceSymbolCount, sourceBlock);
     if (err < 0) { // Error
-        if (DEBUG) bpf_printk("Sender fewFramework: error confirmed\n");
+        // if (DEBUG) bpf_printk("Sender fewFramework: error confirmed\n");
         return -1;
     } else if (err == 2) {
-        if (DEBUG) bpf_printk("Sender: too big packet confirmed 2\n");
+        // if (DEBUG) bpf_printk("Sender: too big packet confirmed 2\n");
         return -1;
     }
 
-    /* A repair symbol is generated and will be forwarded to user space to be forwarded */
+    // A repair symbol is generated and will be forwarded to user space to be forwarded
     if (err == 1) {
         bpf_perf_event_output(skb, map, BPF_F_CURRENT_CPU, &mapStruct->repairSymbol, sizeof(struct repairSymbol_t));
     }

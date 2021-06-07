@@ -3,7 +3,7 @@
 import matplotlib.pyplot as plt
 from pandas.io.pytables import DataCol
 import numpy as np
-import seaborn as sns
+# import seaborn as sns
 import os
 import json
 import yaml
@@ -270,7 +270,7 @@ def analyze_tpc_congestion_window_all(analyze_function=scrap_cw, boxplot=False, 
     colors_without = ["lightcoral", "red", "firebrick", "darkred"]
     colors_rlc = ["slategrey", "darkcyan", "royalblue", "darkblue"]
     col_names = ["k=" + str(i) for i in tp]
-    row_names = ["TCP", "RLC"]
+    row_names = ["Cwnd (KBytes)", "Cwnd (KBytes)"]
 
     # Get by k
     cw_without_by_k = []
@@ -564,7 +564,7 @@ def json_udp_loss(filename, jitter=False):
 
 
 def analyze_udp_traffic(cdf=False, jitter=False):
-    _, _, filenames_without = next(os.walk("results_13_05/udp_without/"))
+    _, _, filenames_without = next(os.walk("results_26_05/udp_without/"))
     _, _, filenames_rlc = next(os.walk("results_13_05/udp_rlc/"))
     _, _, filenames_xor = next(os.walk("results_13_05/udp_xor/"))
 
@@ -577,7 +577,7 @@ def analyze_udp_traffic(cdf=False, jitter=False):
     loss_xor = []
 
     for filename in tqdm(sorted_filenames_without):
-        path = os.path.join("results_13_05/udp_without", filename)
+        path = os.path.join("results_26_05/udp_without", filename)
         loss_without.append(json_udp_loss(path, jitter=jitter))
     
     for filename in tqdm(sorted_filenames_rlc):
@@ -609,13 +609,12 @@ def analyze_udp_traffic(cdf=False, jitter=False):
     ax.grid()
     ax.set_axisbelow(True)
 
-    print(loss_xor_by_k)
-
     if cdf:
         max_val = max([max(loss_without), max(loss_rlc), max(loss_xor)])
-        hist_without, bin_edges_without = np.histogram(loss_without, bins=60, range=(0, max_val + 0.5), density=True)
-        hist_rlc, bin_edges_rlc = np.histogram(loss_rlc, bins=60, range=(0, max_val + 0.5), density=True)
-        hist_xor, bin_edges_xor = np.histogram(loss_xor, bins=60, range=(0, max_val + 0.5), density=True)
+        print(loss_without)
+        hist_without, bin_edges_without = np.histogram(loss_without, bins=100000, range=(0, max_val + 0.5), density=True)
+        hist_rlc, bin_edges_rlc = np.histogram(loss_rlc, bins=250, range=(0, max_val + 0.5), density=True)
+        hist_xor, bin_edges_xor = np.histogram(loss_xor, bins=250, range=(0, max_val + 0.5), density=True)
         dx = bin_edges_without[1] - bin_edges_without[0]
         cdf_without = np.cumsum(hist_without) * dx
         cdf_rlc = np.cumsum(hist_rlc) * dx
@@ -630,8 +629,8 @@ def analyze_udp_traffic(cdf=False, jitter=False):
         bin_edges_xor = [0] + bin_edges_xor
 
         ax.plot(bin_edges_without, cdf_without, label="UDP", color="red", linestyle="-")
-        ax.plot(bin_edges_rlc, cdf_rlc, label="RLC", color="darkblue", linestyle="-.")
-        ax.plot(bin_edges_xor, cdf_xor, label="XOR", color="green", linestyle=":")
+        #ax.plot(bin_edges_rlc, cdf_rlc, label="RLC", color="darkblue", linestyle="-.")
+        #ax.plot(bin_edges_xor, cdf_xor, label="XOR", color="green", linestyle=":")
         if jitter:
             ax.set_xlabel("Jitter [ms]")
         else:
@@ -643,6 +642,8 @@ def analyze_udp_traffic(cdf=False, jitter=False):
         else:
             plt.savefig("figures/exp_udp_loss_cdf.svg")
         plt.show()
+        #plt.plot(loss_without)
+        #plt.show()
     else:
         k_idx = [99, 96, 93, 90]
         d_idx = np.arange(0, 51, 2)
@@ -676,7 +677,7 @@ def analyze_udp_traffic(cdf=False, jitter=False):
             ax.set_ylabel("Percentage of loss during the benchmark [%]")
         # plt.legend(ncol=2,handleheight=2.4, labelspacing=0.05)
         leg3 = plt.legend([p5] + p_without + [p5] + p_rlc + [p5] + p_xor,
-                ["TCP"] + tp_str + ["RLC"] + tp_str + ["XOR"] + tp_str,
+                ["UDP"] + tp_str + ["RLC"] + tp_str + ["XOR"] + tp_str,
                 loc=2, ncol=3) # Two columns, vertical group labels
         if jitter:
             plt.savefig("figures/exp_udp_jitter.svg")
@@ -877,8 +878,8 @@ def analyze_controller_udp_traffic(cdf=False, jitter=False):
 
     if cdf:
         max_val = max([max(loss_std), max(loss_ctr)])
-        hist_std, bin_edges_std = np.histogram(loss_std, bins=60, range=(0, max_val + 0.5), density=True)
-        hist_ctr, bin_edges_ctr = np.histogram(loss_ctr, bins=60, range=(0, max_val + 0.5), density=True)
+        hist_std, bin_edges_std = np.histogram(loss_std, bins=10000, range=(0, max_val + 0.5), density=True)
+        hist_ctr, bin_edges_ctr = np.histogram(loss_ctr, bins=10000, range=(0, max_val + 0.5), density=True)
         dx = bin_edges_std[1] - bin_edges_std[0]
         cdf_std = np.cumsum(hist_std) * dx
         cdf_ctr = np.cumsum(hist_ctr) * dx
@@ -950,7 +951,7 @@ def scrap_bytes_from_controller(filename):
     counter = 0
     local_res = []
     for line in lines:
-        if line.split()[-3] == "Total":
+        if line.split()[-6] == "Total":
             if int(line.split()[-1]) >= 1000000:
                 local_res.append(int(line.split()[-1]))
             counter += 1
@@ -962,9 +963,10 @@ def scrap_bytes_from_controller(filename):
 
 
 def controller_udp_bytes(cdf=False):
-    baseline = scrap_bytes_from_controller("results_18_05/udp_controller/baseline_dropper_output.txt")[0]
-    standard = scrap_bytes_from_controller("results_18_05/udp_controller/standard_dropper_output.txt")
-    controller = scrap_bytes_from_controller("results_18_05/udp_controller/controller_dropper_output.txt")
+    # Total received. Packets: 2063, Bytes: 4607946
+    baseline = 4607946
+    standard = scrap_bytes_from_controller("results_26_05/controller_without_dropper.txt")
+    controller = scrap_bytes_from_controller("results_26_05/controller_1024_dropper.txt")
     print(standard)
     print("---")
     print(controller)
@@ -1019,10 +1021,116 @@ def controller_udp_bytes(cdf=False):
         plt.show()
 
 
+def analyze_apache_benchmark_csv():
+    dir_without = "ab_27_05/without/csv"
+    dir_rlc_4_2 = "ab_27_05/rlc_4_2/csv"
+
+    _, _, filenames_std = next(os.walk(dir_without))
+    _, _, filenames_ctr = next(os.walk(dir_rlc_4_2))
+
+    sorted_filenames_std = sorted(filenames_std, key=sort_list_by_idx)
+    sorted_filenames_ctr = sorted(filenames_ctr, key=sort_list_by_idx)
+
+    loss_std = []
+    loss_ctr = []
+    
+    for filename in tqdm(sorted_filenames_std):
+        data = pd.read_csv(os.path.join(dir_without, filename))
+        x = data.values[:, 0]
+        y = data.values[:, 1]
+        plt.plot(y, x, color="red")
+    
+    for filename in tqdm(sorted_filenames_ctr):
+        data = pd.read_csv(os.path.join(dir_rlc_4_2, filename))
+        x = data.values[:, 0]
+        y = data.values[:, 1]
+        plt.plot(y, x, color="darkblue", linestyle=":")
+    
+    plt.xlim((0, 500))
+
+    plt.show()
+
+
+def scrap_ab_per_file(filename):
+    with open(filename, "r") as fd:
+        lines = fd.readlines()
+    for line in lines:
+        tab = line.split()
+        if len(tab) < 4: continue
+        if tab[0] == "Time" and tab[2] == "request:":
+            return float(tab[3])
+
+
+def scrap_ab_big(filename):
+    total = []
+    with open(filename, "r") as fd:
+        lines = fd.readlines()
+    for line in lines:
+        tab = line.split()
+        if len(tab) < 4: continue
+        if tab[0] == "Time" and tab[2] == "request:" and float(tab[3]) > 50:
+            total.append(float(tab[3]))
+    return total
+
+
+def analyze_apache_benchmark_scrap():
+    dir_without = "ab_27_05/without/terminal"
+    dir_rlc_4_2 = "ab_27_05/rlc_4_2/ab_global.txt"
+
+    _, _, filenames_without = next(os.walk(dir_without))
+
+    sorted_filenames_without = sorted(filenames_without, key=sort_list_by_idx)
+
+    time_without = []
+    time_rlc_4_2 = []
+
+    for filename in sorted_filenames_without:
+        val = scrap_ab_per_file(os.path.join(dir_without, filename))
+        if val is not None:
+            time_without.append(val)
+    
+    time_rlc_4_2 = scrap_ab_big(dir_rlc_4_2)
+
+    print(time_without)
+
+    min_x = min([min(time_without), min(time_rlc_4_2)])
+    max_x = max([max(time_without), max(time_rlc_4_2)])
+    max_x = 330
+
+    hist_without, bin_edges_without = np.histogram(time_without, bins=10000, range=(min_x - 0.5, max_x + 0.5), density=True)
+    hist_rlc, bin_edges_rlc = np.histogram(time_rlc_4_2, bins=10000, range=(min_x - 0.5, max_x + 0.5), density=True)
+    dx = bin_edges_without[1] - bin_edges_without[0]
+    cdf_without = np.cumsum(hist_without) * dx
+    cdf_rlc = np.cumsum(hist_rlc) * dx
+
+    # Dummy values
+    cdf_rlc = np.insert(cdf_rlc, 0, 0)
+    cdf_without = np.insert(cdf_without, 0, 0)
+    bin_edges_rlc = [0] + bin_edges_rlc
+    bin_edges_without = [0] + bin_edges_without
+
+    fig, ax = plt.subplots()
+    ax.grid()
+    ax.set_axisbelow(True)
+
+    ax.plot(bin_edges_without, cdf_without, color="red", label="TCP")
+    ax.plot(bin_edges_rlc, cdf_rlc, color="darkblue", label="RLC_4_2")
+
+    plt.ylabel("CDF")
+    plt.xlabel("Average time per request")
+    # plt.tight_layout()
+    # plt.gca().xaxis.set_major_formatter(PercentFormatter(1))
+
+    plt.legend(loc="best")
+    plt.savefig("figures/exp_ab_latency_cdf.svg")
+    plt.show()
+
+    plt.show()
+
 
 if __name__ == "__main__":
     # plugin_overhead()
-    analyze_tpc_congestion_window_all(scrap_cw, boxplot=True)
+    # analyze_tpc_congestion_window_all(scrap_cw, boxplot=True)
     # analyze_udp_loss(cdf=True, boxplot=True)
     # analyze_tcp_quality()
     # analyze_retransmission()
@@ -1030,5 +1138,7 @@ if __name__ == "__main__":
     # rlc_vs_udp()
     # analyze_controller()
     # controller_by_k()
-    # analyze_controller_udp_traffic(cdf=True)
+    # analyze_controller_udp_traffic(cdf=True)  # Loss
     # controller_udp_bytes(cdf=True)
+    analyze_apache_benchmark_scrap()
+    # analyze_apache_benchmark_csv()

@@ -55,7 +55,7 @@ parser.add_argument("--udp", help="Use UDP instead of TCP", action="store_true")
 parser.add_argument("--tcp-quality", help="Quality measurement TCP [bits]", type=int, default=0)
 parser.add_argument("--fec", help="Test using FEC", action="store_true")
 parser.add_argument("-t", help="Time of a test [s]", type=int, default=45)
-parser.add_argument("-b", help="Bit rate in bps", type=int, default=1)
+parser.add_argument("-b", help="Bit rate in bps", type=int, default=1000000)
 args = parser.parse_args()
 
 protection = "rlc" if args.fec else "without"
@@ -66,50 +66,53 @@ signal.signal(signal.SIGINT, signal_handler)
 print('Press Ctrl+C')
 if args.tcp_quality == 0:
     transport_cmd = "--udp -l 280" if args.udp else "-M 280"
-    output_dir_template = lambda: f" >> {args.output}/baseline.json"
-    bench_template = f"iperf3 -c 2042:dd::1 -t {args.t} {transport_cmd}"
+    output_dir_template = f" >> {args.output}/run_udp_global.json"
+    bench_template = f"iperf3 -c 2042:dd::1 -t {args.t} {transport_cmd} --json"
     # bench_template = f"iperf3 -c 2042:dd::1 --bytes 10000000 {transport_cmd} --json"
     print(bench_template)
     scapy_args = Crafting(verbose=False, source="2042:aa::1", destination=update_destination, port=3333)
     scapy_args_run = Crafting(verbose=False, source="2042:aa::1", destination=update_destination, port=3334)
 
-    for i in range(1):
+    output_dir = "" if args.output is None else output_dir_template
+    if len(output_dir) > 0: os.system(f"echo [ {output_dir}")
+    for i in range(104):
         print(i)
-        output_dir = "" if args.output is None else output_dir_template()
-        #os.system(f"echo [ {output_dir}")
-        command = f"{bench_template}"#" {output_dir}"
+        if len(output_dir) > 0: os.system(f"echo [ {output_dir}")
+        command = f"{bench_template} {output_dir}"
         for i in range(3):
             os.system(command)
             if i < 2:
-                #os.system(f"echo , {output_dir}")
+                if len(output_dir) > 0: os.system(f"echo , {output_dir}")
                 pkt = craft_srv6_packet(scapy_args_run, "yyyyyyyyyyyy")
                 send(pkt)
-        #os.system(f"echo ] {output_dir}")
+        if len(output_dir) > 0: os.system(f"echo ] {output_dir}")
+        if i < 259: os.system(f"echo , {output_dir}")
 
         # Notify the dropper that we can update the parameters for the next state
         pkt = craft_srv6_packet(scapy_args, "zzzzzzzzzzz")
         send(pkt)
         print("Sent update packet !")
-        time.sleep(0.1)
+        time.sleep(1)
+    os.system(f"echo ] {output_dir}")
 else:
     output_dir_template = lambda: f" >> {args.output}/mqt_res_run_10_{i}.json"
-    bench_template = f"iperf3 --client 2042:dd::1 --bytes {args.tcp_quality} -M 280 -b {args.b} --json"
+    bench_template = f"iperf3 --client 2042:dd::1 --bytes {args.tcp_quality} -M 280 -b {args.b}"
     print(bench_template)
     scapy_args = Crafting(verbose=False, source="2042:aa::1", destination=update_destination, port=3333)
 
-    for i in range(104):
+    for i in range(1):
         print(i)
         output_dir = "" if args.output is None else output_dir_template()
-        os.system(f"echo [ {output_dir}")
+        if len(output_dir) > 0: os.system(f"echo [ {output_dir}")
         command = f"{bench_template} {output_dir}"
-        for j in range(3):
+        for j in range(1):
             os.system(command)
             if j < 2:
-                os.system(f"echo , {output_dir}")
+                if len(output_dir) > 0: os.system(f"echo , {output_dir}")
                 pass
-        os.system(f"echo ] {output_dir}")
+        if len(output_dir) > 0: os.system(f"echo ] {output_dir}")
 
         pkt = craft_srv6_packet(scapy_args, "zzzzzzzzzzz")
-        send(pkt)
+        # send(pkt)
         print("Sent update packet !")
         time.sleep(0.1)

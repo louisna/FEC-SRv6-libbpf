@@ -54,7 +54,11 @@ static __always_inline int fecFramework__convolution(struct __sk_buff *skb, void
     tlv->tlv_type = TLV_CODING_SOURCE;
     tlv->len = sizeof(struct tlvSource__convo_t) - 2;
     tlv->encodingSymbolID = encodingSymbolID;
-    tlv->controller_update = fecConvolution->controller_period;
+    if (fecConvolution->controller_repair & 0x2) {
+        tlv->controller_update = fecConvolution->controller_period;
+    } else {
+        tlv->controller_update = 0;
+    }
 
     // Get pointer in the ring buffer to store the source symbol
     __u32 ringBufferIndex = encodingSymbolID % windowSize;

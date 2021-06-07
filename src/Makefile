@@ -87,3 +87,5 @@ $(APPS): %: $(OUTPUT)/%.o raw_socket/raw_socket_sender.o raw_socket/raw_socket_r
 # keep intermediate (.skel.h, .bpf.o, etc) targets
 .SECONDARY:
 
+craw:
+	rm raw_socket/*.o
