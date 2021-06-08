@@ -9,6 +9,8 @@
 #define MAX_WINDOW_CHECK 5
 #define LOOP for(int ____i = 0; ____i < 1000; ____i++) {}
 
+// This file is strongly inspired from the FEC plugin of PQUIC: https://github.com/p-quic/pquic/blob/master/plugins/fec/fec_scheme_protoops/rlc_fec_scheme_gf256.c
+
 void print_recovered(recoveredSource_t *recoveredPacket) {
     uint8_t *packet = recoveredPacket->packet;
     for (int i = 0; i < 158; ++i) {
