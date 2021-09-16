@@ -36,7 +36,7 @@ class CompareTcpUdpPlugin(IPTopo):
         l[rA].addParams(ip="2042:ae::a/64")
         l[rE].addParams(ip="2042:ae::e/64")
 
-        l = self.addLink(rE, rD, delay="10ms")
+        l = self.addLink(rE, rD, delay="10ms", bw=15)
         l[rE].addParams(ip="2042:de::e/64")
         l[rD].addParams(ip="2042:de::d/64")
 
