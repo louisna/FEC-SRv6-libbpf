@@ -3,17 +3,146 @@
 import matplotlib.pyplot as plt
 from pandas.io.pytables import DataCol
 import numpy as np
-# import seaborn as sns
+import seaborn as sns
 import os
 import json
 import yaml
 from tqdm import tqdm
 import pandas as pd
+import matplotlib
+import itertools
+LATEX = True
+if LATEX:
+    matplotlib.use("pgf")
+    matplotlib.rcParams.update({
+        "pgf.texsystem": "pdflatex",
+        'font.family': 'serif',
+        'text.usetex': True,
+        'pgf.rcfonts': False,
+    })
+    font_size = 18
+    params = {
+        'axes.labelsize': font_size, # fontsize for x and y labels (was 10)
+        'axes.titlesize': font_size,
+        #'text.fontsize': 11, # was 10
+        'legend.fontsize': font_size, # was 10
+        'xtick.labelsize': font_size,
+        'ytick.labelsize': font_size,
+    }
+    plt.rcParams.update(params)
+    matplotlib.rcParams.update(params)
+    plt.rcParams["font.weight"] = "bold"
+    plt.rcParams["axes.labelweight"] = "bold"
 
 
 def sort_list_by_idx(filename):
+    if filename == ".DS_Store": return -1
     nb = filename.split("_")[-1].split(".")[0]
     return int(nb)
+
+
+def plugin_overhead_slides():
+    ip6_len = 40
+    srh_source_len = 8 + 16 + 16 + 16
+    srh_repair_len = 8 + 16 + 16
+    tlv_source_len = 8
+    tlv_repair_len = 16
+    udp_len = 8
+    tcp_len = 32
+    mqtt_payload = 100
+    repair_payload = mqtt_payload + ip6_len + srh_source_len + tcp_len
+    
+    # Colors
+    palette = itertools.cycle(sns.color_palette("pastel"))
+    c_ip6 = next(palette)
+    c_srh_source = next(palette)
+    c_srh_repair = next(palette)
+    c_tlv_source = next(palette)
+    c_tlv_repair = next(palette)
+    c_udp = next(palette)
+    c_mqtt_payload = next(palette)
+    c_repair_payload = next(palette)
+    c_tcp = next(palette)
+
+    all_patterns = [ "/" , "\\" , "+" , "|" , "x" , "O", "o", "-", "."]
+    # Patterns
+    p_ip6 = all_patterns[0]
+    p_srh_source = all_patterns[1]
+    p_srh_repair = all_patterns[2]
+    p_tlv_source = all_patterns[3]
+    p_tlv_repair = all_patterns[4]
+    p_udp = all_patterns[5]
+    p_tcp = all_patterns[6]
+    p_mqtt_payload = all_patterns[7]
+    p_repair_payload = all_patterns[8]
+
+    all_colors = [c_ip6, c_srh_source, c_srh_repair, c_tlv_source,
+        c_tlv_repair, c_udp, c_tcp, c_mqtt_payload, c_repair_payload]
+
+    # Names
+    all_names = ["IPv6 Header", "Source Symbol SRH", "Repair Symbol SRH", "Source TLV", "Repair TLV",
+        "UDP Header", "TCP Header", "MQTT Payload", "Repair payload"]
+
+    all_legend = [True, True, False, True, False, False, True, True, False]
+
+    normal_udp = [mqtt_payload, tcp_len, ip6_len]
+    normal_udp_colors = [c_mqtt_payload, c_tcp, c_ip6]
+    normal_pattern = [p_mqtt_payload, p_tcp, p_ip6]
+    source_udp = [mqtt_payload, tcp_len, tlv_source_len, srh_source_len, ip6_len]
+    source_udp_colors = [c_mqtt_payload, c_tcp, c_tlv_source, c_srh_source, c_ip6]
+    source_pattern = [p_mqtt_payload, p_tcp, p_tlv_source, p_srh_source, p_ip6]
+    repair_udp = [repair_payload, udp_len, tlv_repair_len, srh_repair_len, ip6_len]
+
+    normal_udp_bars = np.cumsum(normal_udp)
+    source_udp_bars = np.cumsum(source_udp)
+
+    fig, ax = plt.subplots(figsize=(7, 4))  # figsize=(5, 2)
+    width = 0.5
+    ax.grid(b=True, which='major', linestyle='-', axis="y")
+    ax.set_axisbelow(True)
+
+    # Set style
+    # plt.style.use(['seaborn-paper', 'seaborn-whitegrid'])
+    # plt.style.use(['seaborn'])
+    # sns.set(palette='colorblind')
+    # colors = sns.color_palette(palette='colorblind')
+    
+    for elem, color, pattern in zip(reversed(normal_udp_bars), reversed(normal_udp_colors), reversed(normal_pattern)):
+        ax.bar(0, elem, width=0.5, color=color, hatch=pattern, alpha=0.99)
+    for elem, color, pattern in zip(reversed(normal_udp_bars), reversed(normal_udp_colors), reversed(normal_pattern)):
+        ax.bar(0, elem, width=0.5, color="none", edgecolor="grey")
+    
+    for elem, color, pattern in zip(reversed(source_udp_bars), reversed(source_udp_colors), reversed(source_pattern)):
+        ax.bar(1, elem, width=0.5, color=color, hatch=pattern, alpha=0.99)
+    for elem, color, pattern in zip(reversed(source_udp_bars), reversed(source_udp_colors), reversed(source_pattern)):
+        ax.bar(1, elem, width=0.5, color="none", edgecolor="grey")
+
+    # Plot for legend
+    for color, name, pattern, to_plot in zip(all_colors, all_names, all_patterns, all_legend):
+        if to_plot:
+            ax.bar(0, 0, width=0, color=color, label=name, hatch=pattern)
+    
+    
+    # plt.title("Overhead caused by the FEC plugin for the MQTT benchmark")
+    plt.ylabel("Size of the packet in bytes")
+    plt.xticks([0, 1, 2], ("TCP", "Source\nSymbol", "Repair Symbol"))
+    plt.xlim((-0.5, 1.5))
+    plt.ylim((0, 300))
+    # bbox_to_anchor=(1.04,1)
+    leg = plt.legend(bbox_to_anchor=(1.04,1), loc="upper left", labelspacing=1.0, borderpad=1.2)
+    for lh in leg.legendHandles:
+        lh.set_alpha(0.99)
+        lh.set_height(15.0)
+    
+    fig.tight_layout()
+
+    if LATEX:
+        # plt.savefig("exp_overhead.pgf", bbox_inches="tight")
+        plt.savefig("../mqtt_topo/poster/mqtt_plugin_overhead.pgf", transparent=True)
+    plt.savefig("exp_overhead.pdf", bbox_inches="tight")
+
+    if not LATEX:
+        plt.show()
 
 
 def plugin_overhead():
@@ -23,32 +152,51 @@ def plugin_overhead():
     tlv_source_len = 8
     tlv_repair_len = 16
     udp_len = 8
-    udp_payload = 10
-    repair_payload = 106 + 8
-
+    tcp_len = 32
+    mqtt_payload = 100
+    repair_payload = mqtt_payload + ip6_len + srh_source_len + tcp_len
+    
     # Colors
-    c_ip6 = "C1"
-    c_srh_source = "C2"
-    c_srh_repair = "C3"
-    c_tlv_source = "C4"
-    c_tlv_repair = "C5"
-    c_udp = "C6"
-    c_udp_payload = "C7"
-    c_repair_payload = "C8"
+    palette = itertools.cycle(sns.color_palette("pastel"))
+    c_ip6 = next(palette)
+    c_srh_source = next(palette)
+    c_srh_repair = next(palette)
+    c_tlv_source = next(palette)
+    c_tlv_repair = next(palette)
+    c_udp = next(palette)
+    c_mqtt_payload = next(palette)
+    c_repair_payload = next(palette)
+    c_tcp = next(palette)
+
+    all_patterns = [ "/" , "\\" , "+" , "|" , "x" , "O", "o", "-", "."]
+    # Patterns
+    p_ip6 = all_patterns[0]
+    p_srh_source = all_patterns[1]
+    p_srh_repair = all_patterns[2]
+    p_tlv_source = all_patterns[3]
+    p_tlv_repair = all_patterns[4]
+    p_udp = all_patterns[5]
+    p_tcp = all_patterns[6]
+    p_mqtt_payload = all_patterns[7]
+    p_repair_payload = all_patterns[8]
 
     all_colors = [c_ip6, c_srh_source, c_srh_repair, c_tlv_source,
-        c_tlv_repair, c_udp, c_udp_payload, c_repair_payload]
+        c_tlv_repair, c_udp, c_tcp, c_mqtt_payload, c_repair_payload]
 
     # Names
     all_names = ["IPv6 Header", "Source Symbol SRH", "Repair Symbol SRH", "Source TLV", "Repair TLV",
-        "UDP Header", "Payload", "Repair payload"]
+        "UDP Header", "TCP Header", "MQTT Payload", "Repair payload"]
+    
 
-    normal_udp = [udp_payload, udp_len, ip6_len]
-    normal_udp_colors = [c_udp_payload, c_udp, c_ip6]
-    source_udp = [udp_payload, udp_len, tlv_source_len, srh_source_len, ip6_len]
-    source_udp_colors = [c_udp_payload, c_udp, c_tlv_source, c_srh_source, c_ip6]
+    normal_udp = [mqtt_payload, tcp_len, ip6_len]
+    normal_udp_colors = [c_mqtt_payload, c_tcp, c_ip6]
+    normal_pattern = [p_mqtt_payload, p_tcp, p_ip6]
+    source_udp = [mqtt_payload, tcp_len, tlv_source_len, srh_source_len, ip6_len]
+    source_udp_colors = [c_mqtt_payload, c_tcp, c_tlv_source, c_srh_source, c_ip6]
+    source_pattern = [p_mqtt_payload, p_tcp, p_tlv_source, p_srh_source, p_ip6]
     repair_udp = [repair_payload, udp_len, tlv_repair_len, srh_repair_len, ip6_len]
     repair_udp_colors = [c_repair_payload, c_udp, c_tlv_repair, c_srh_repair, c_ip6]
+    repair_pattern = [p_repair_payload, p_udp, p_tlv_repair, p_srh_repair, p_ip6]
 
     normal_udp_bars = np.cumsum(normal_udp)
     source_udp_bars = np.cumsum(source_udp)
@@ -56,39 +204,52 @@ def plugin_overhead():
 
     fig, ax = plt.subplots()
     width = 0.5
+    ax.grid(b=True, which='major', linestyle='-', axis="y")
+    ax.set_axisbelow(True)
 
     # Set style
-    plt.style.use(['seaborn-paper', 'seaborn-whitegrid'])
-    plt.style.use(['seaborn'])
-    sns.set(palette='colorblind')
-    colors = sns.color_palette(palette='colorblind')
+    # plt.style.use(['seaborn-paper', 'seaborn-whitegrid'])
+    # plt.style.use(['seaborn'])
+    # sns.set(palette='colorblind')
+    # colors = sns.color_palette(palette='colorblind')
     
-    for elem, color in zip(reversed(normal_udp_bars), reversed(normal_udp_colors)):
-        ax.bar(0, elem, width=0.5, color=color)
+    for elem, color, pattern in zip(reversed(normal_udp_bars), reversed(normal_udp_colors), reversed(normal_pattern)):
+        ax.bar(0, elem, width=0.5, color=color, hatch=pattern, alpha=0.99)
+    for elem, color, pattern in zip(reversed(normal_udp_bars), reversed(normal_udp_colors), reversed(normal_pattern)):
+        ax.bar(0, elem, width=0.5, color="none", edgecolor="grey")
     
-    for elem, color in zip(reversed(source_udp_bars), reversed(source_udp_colors)):
-        ax.bar(1, elem, width=0.5, color=color)
+    for elem, color, pattern in zip(reversed(source_udp_bars), reversed(source_udp_colors), reversed(source_pattern)):
+        ax.bar(1, elem, width=0.5, color=color, hatch=pattern, alpha=0.99)
+    for elem, color, pattern in zip(reversed(source_udp_bars), reversed(source_udp_colors), reversed(source_pattern)):
+        ax.bar(1, elem, width=0.5, color="none", edgecolor="grey")
     
-    for elem, color in zip(reversed(repair_udp_bars), reversed(repair_udp_colors)):
-        ax.bar(2, elem, width=0.5, color=color)
+    for elem, color, pattern in zip(reversed(repair_udp_bars), reversed(repair_udp_colors), reversed(repair_pattern)):
+        ax.bar(2, elem, width=0.5, color=color, hatch=pattern, alpha=0.99)
+    for elem, color, pattern in zip(reversed(repair_udp_bars), reversed(repair_udp_colors), reversed(repair_pattern)):
+        ax.bar(2, elem, width=0.5, color="none", edgecolor="grey")
 
     # Plot for legend
-    for color, name in zip(all_colors, all_names):
-        plt.plot(-10, -10, color=color, label=name)
+    for color, name, pattern in zip(all_colors, all_names, all_patterns):
+        ax.bar(0, 0, width=0, color=color, label=name, hatch=pattern)
     
     
-    plt.title("Overhead caused by the FEC plugin compared \nto a simple UDP packet (10 bytes payload)")
-    plt.ylabel("Bytes of the packet")
-    plt.xticks([0, 1, 2], ("UDP", "Source Symbol", "Repair Symbol"))
-    ax.grid(axis="y")
-    ax.set_axisbelow(True)
+    plt.title("Overhead caused by the FEC plugin for the MQTT benchmark")
+    plt.ylabel("Size of the packet in bytes")
+    plt.xticks([0, 1, 2], ("TCP", "Source Symbol", "Repair Symbol"))
     plt.xlim((-0.5, 2.5))
-    plt.ylim((0, 250))
-    plt.legend(loc="best")
-    plt.savefig("overhead.png")
-    plt.savefig("overhead.svg")
+    plt.ylim((0, 400))
+    # bbox_to_anchor=(1.04,1)
+    leg = plt.legend(bbox_to_anchor=(1.04,1), loc="upper left", labelspacing=1.0, borderpad=1.2)
+    for lh in leg.legendHandles:
+        lh.set_alpha(0.99)
+        lh.set_height(15.0)
+    
+    if LATEX:
+        plt.savefig("exp_overhead.pgf", bbox_inches="tight")
+    plt.savefig("exp_overhead.pdf", bbox_inches="tight")
 
-    plt.show()
+    if not LATEX:
+        plt.show()
 
 
 def scrap_cw(filename):
@@ -564,7 +725,7 @@ def json_udp_loss(filename, jitter=False):
 
 
 def analyze_udp_traffic(cdf=False, jitter=False):
-    _, _, filenames_without = next(os.walk("results_26_05/udp_without/"))
+    _, _, filenames_without = next(os.walk("results_13_05/udp_without/"))
     _, _, filenames_rlc = next(os.walk("results_13_05/udp_rlc/"))
     _, _, filenames_xor = next(os.walk("results_13_05/udp_xor/"))
 
@@ -577,14 +738,17 @@ def analyze_udp_traffic(cdf=False, jitter=False):
     loss_xor = []
 
     for filename in tqdm(sorted_filenames_without):
-        path = os.path.join("results_26_05/udp_without", filename)
+        if filename == ".DS_Store": continue
+        path = os.path.join("results_13_05/udp_without", filename)
         loss_without.append(json_udp_loss(path, jitter=jitter))
     
     for filename in tqdm(sorted_filenames_rlc):
+        if filename == ".DS_Store": continue
         path = os.path.join("results_13_05/udp_rlc", filename)
         loss_rlc.append(json_udp_loss(path, jitter=jitter))
     
     for filename in tqdm(sorted_filenames_xor):
+        if filename == ".DS_Store": continue
         path = os.path.join("results_13_05/udp_xor", filename)
         loss_xor.append(json_udp_loss(path, jitter=jitter))
     
@@ -605,19 +769,22 @@ def analyze_udp_traffic(cdf=False, jitter=False):
         loss_rlc_by_k.append(by_d_rlc)
         loss_xor_by_k.append(by_d_xor)
     
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(6.5, 3.5))  # figsize=(5, 2)
     ax.grid()
     ax.set_axisbelow(True)
 
     if cdf:
         max_val = max([max(loss_without), max(loss_rlc), max(loss_xor)])
         print(loss_without)
-        hist_without, bin_edges_without = np.histogram(loss_without, bins=100000, range=(0, max_val + 0.5), density=True)
-        hist_rlc, bin_edges_rlc = np.histogram(loss_rlc, bins=250, range=(0, max_val + 0.5), density=True)
-        hist_xor, bin_edges_xor = np.histogram(loss_xor, bins=250, range=(0, max_val + 0.5), density=True)
+        n_bins = 1000
+        hist_without, bin_edges_without = np.histogram(loss_without, bins=n_bins, range=(min(loss_without), max(loss_without) + 0.01), density=True)
+        hist_rlc, bin_edges_rlc = np.histogram(loss_rlc, bins=n_bins, range=(min(loss_rlc), max(loss_rlc) + 0.01), density=True)
+        hist_xor, bin_edges_xor = np.histogram(loss_xor, bins=n_bins, range=(min(loss_xor), max(loss_xor) + 0.01), density=True)
         dx = bin_edges_without[1] - bin_edges_without[0]
         cdf_without = np.cumsum(hist_without) * dx
+        dx = bin_edges_rlc[1] - bin_edges_rlc[0]
         cdf_rlc = np.cumsum(hist_rlc) * dx
+        dx = bin_edges_xor[1] - bin_edges_xor[0]
         cdf_xor = np.cumsum(hist_xor) * dx
 
         # Dummy values
@@ -628,20 +795,22 @@ def analyze_udp_traffic(cdf=False, jitter=False):
         bin_edges_without = [0] + bin_edges_without
         bin_edges_xor = [0] + bin_edges_xor
 
-        ax.plot(bin_edges_without, cdf_without, label="UDP", color="red", linestyle="-")
-        #ax.plot(bin_edges_rlc, cdf_rlc, label="RLC", color="darkblue", linestyle="-.")
-        #ax.plot(bin_edges_xor, cdf_xor, label="XOR", color="green", linestyle=":")
+        ax.plot(bin_edges_without, cdf_without, label="UDP", color="red", linestyle="-", linewidth=3)
+        ax.plot(bin_edges_rlc, cdf_rlc, label="RLC (+50%)", color="darkblue", linestyle="-.", linewidth=3)
+        ax.plot(bin_edges_xor, cdf_xor, label="XOR (+50%)", color="green", linestyle="--", linewidth=3)
         if jitter:
             ax.set_xlabel("Jitter [ms]")
         else:
-            ax.set_xlabel("Percentage of loss during the benchmark [%]")
-        ax.set_ylabel("CDF")
+            ax.set_xlabel("Loss during the benchmark [%]")
+        ax.set_ylabel("ECDF")
         plt.legend(loc="best")
+        plt.tight_layout()
         if jitter:
-            plt.savefig("figures/exp_udp_jitter_cdf.svg")
+            plt.savefig("figures/exp_udp_jitter_cdf.pgf")
         else:
-            plt.savefig("figures/exp_udp_loss_cdf.svg")
-        plt.show()
+            # plt.savefig("figures/exp_udp_loss_cdf.pgf")
+            plt.savefig("../mqtt_topo/poster/udp_loss.pgf", transparent=True)
+        # plt.show()
         #plt.plot(loss_without)
         #plt.show()
     else:
@@ -652,18 +821,21 @@ def analyze_udp_traffic(cdf=False, jitter=False):
         colors_without = ["lightcoral", "red", "firebrick", "darkred"]
         colors_rlc = ["slategrey", "darkcyan", "royalblue", "darkblue"]
         colors_xor = ["gold", "yellowgreen", "lightgreen", "darkgreen"]
+        marker_without = ["<", ">", "^", "v"]
+        marker_rlc = ["d", "x", "X", "."]
+        marker_xor = ["1", "2", "3", "4"]
         p_without = []  # Legend link
         p_rlc = []
         p_xor = []
 
         for i, k in enumerate(loss_without_by_k):
-            p, = plt.plot(d_idx, k, linestyle=linestyles[i], color=colors_without[i])
+            p, = plt.plot(d_idx, k, linestyle=linestyles[i], color=colors_without[i], marker=marker_without[i])
             p_without.append(p)
         for i, k  in enumerate(loss_rlc_by_k):
-            p,  = plt.plot(d_idx, k, linestyle=linestyles[i], color=colors_rlc[i])
+            p,  = plt.plot(d_idx, k, linestyle=linestyles[i], color=colors_rlc[i], marker=marker_rlc[i])
             p_rlc.append(p)
         for i, k  in enumerate(loss_xor_by_k):
-            p,  = plt.plot(d_idx, k, linestyle=linestyles[i], color=colors_xor[i])
+            p,  = plt.plot(d_idx, k, linestyle=linestyles[i], color=colors_xor[i], marker=marker_xor[i])
             p_xor.append(p)
 
         # Dummy plot
@@ -680,10 +852,10 @@ def analyze_udp_traffic(cdf=False, jitter=False):
                 ["UDP"] + tp_str + ["RLC"] + tp_str + ["XOR"] + tp_str,
                 loc=2, ncol=3) # Two columns, vertical group labels
         if jitter:
-            plt.savefig("figures/exp_udp_jitter.svg")
+            plt.savefig("figures/exp_udp_jitter.pgf")
         else:
-            plt.savefig("figures/exp_udp_loss.svg")
-        plt.show()
+            plt.savefig("figures/exp_udp_loss.pgf")
+        # plt.show()
 
 
 def rlc_vs_udp():
@@ -785,30 +957,34 @@ def analyze_controller():
     val_control = val_control_sec
     idx_control = idx_control_sec
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(6.5, 4))
     ax.grid()
     ax.set_axisbelow(True)
 
     p_control = []
     p_without = []
-    p, = ax.plot(idx_without, val_without, color="darkblue", label="rE")
+    p, = ax.plot(idx_without, val_without, color="blue", label="rE", linewidth=4)
     p_without.append(p)
-    p, = ax.plot(idx_control, val_control, linestyle=":", color="firebrick", label="rE")
+    p, = ax.plot(idx_control, val_control, linestyle="-", color="darkorange", label="rE", linewidth=2)
     p_control.append(p)
-    p, = ax.plot(idx_without_hd, val_without_hd, linestyle="-", color="darkcyan", label="hD")
+    p, = ax.plot(idx_without_hd, val_without_hd, linestyle="-", color="green", label="hD", linewidth=4)
     p_without.append(p)
-    p, = ax.plot(idx_control_hd, val_control_hd, linestyle="-.", color="darkred", label="hD")
+    p, = ax.plot(idx_control_hd, val_control_hd, linestyle="-", color="red", label="hD", linewidth=2)
     p_control.append(p)
-    p5, = plt.plot([0], marker='None',
+    """ p5, = plt.plot([0], marker='None',
                 linestyle='None', label='dummy-tophead')
     leg3 = plt.legend([p5] + p_without + [p5] + p_control,
-                    ["Standard"] + ["rE", "hD"] + ["Controller"] + ["rE", "hD"],
-                    loc="best", ncol=2) # Two columns, vertical group labels
-    ax.set_xlabel("Time of the experiment [s]")
-    ax.set_ylabel("KBytes received by tcpdump per 1 second")
+                    ["SRv6-FEC"] + ["protected link", "server"] + ["SRv6-FEC + Controller"] + ["protected link", "server"],
+                    loc="best", ncol=2) # Two columns, vertical group labels """
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("KBytes/second received")
     plt.ylim((140, 380))
-    plt.savefig("figures/exp_controller_udp.svg")
-    plt.show()
+    plt.tight_layout()
+    # plt.savefig("figures/exp_controller_udp.pgf")
+    if LATEX:
+        plt.savefig("../mqtt_topo/poster/controller_udp.pgf", transparent=True)
+    # plt.savefig("figures/exp_controller_udp.pdf")
+    else: plt.show()
 
 
 def controller_by_k():
@@ -878,10 +1054,11 @@ def analyze_controller_udp_traffic(cdf=False, jitter=False):
 
     if cdf:
         max_val = max([max(loss_std), max(loss_ctr)])
-        hist_std, bin_edges_std = np.histogram(loss_std, bins=10000, range=(0, max_val + 0.5), density=True)
-        hist_ctr, bin_edges_ctr = np.histogram(loss_ctr, bins=10000, range=(0, max_val + 0.5), density=True)
+        hist_std, bin_edges_std = np.histogram(loss_std, bins=10000, range=(min(loss_std), max(loss_std) + 0.1), density=True)
+        hist_ctr, bin_edges_ctr = np.histogram(loss_ctr, bins=10000, range=(min(loss_ctr), max(loss_ctr) + 0.1), density=True)
         dx = bin_edges_std[1] - bin_edges_std[0]
         cdf_std = np.cumsum(hist_std) * dx
+        dx = bin_edges_ctr[1] - bin_edges_ctr[0]
         cdf_ctr = np.cumsum(hist_ctr) * dx
 
         # Dummy values
@@ -895,14 +1072,14 @@ def analyze_controller_udp_traffic(cdf=False, jitter=False):
         if jitter:
             ax.set_xlabel("Jitter [ms]")
         else:
-            ax.set_xlabel("Percentage of loss during the benchmark [%]")
-        ax.set_ylabel("CDF")
+            ax.set_xlabel("Loss during the benchmark [%]")
+        ax.set_ylabel("ECDF")
         plt.legend(loc="best")
         if jitter:
             plt.savefig("figures/exp_controller_udp_jitter_cdf.svg")
         else:
-            plt.savefig("figures/exp_controller_udp_loss_cdf.svg")
-        plt.show()
+            plt.savefig("figures/exp_controller_udp_loss_cdf.pgf")
+        # plt.show()
     else:
         k_idx = [99, 96, 93, 90]
         d_idx = np.arange(0, 51, 2)
@@ -930,7 +1107,7 @@ def analyze_controller_udp_traffic(cdf=False, jitter=False):
         if jitter:
             ax.set_ylabel("Jitter [ms]")
         else:    
-            ax.set_ylabel("Percentage of loss during the benchmark [%]")
+            ax.set_ylabel("Loss during the benchmark [%]")
         # plt.legend(ncol=2,handleheight=2.4, labelspacing=0.05)
         leg3 = plt.legend([p5] + p_std + [p5] + p_ctr,
                 ["Standard"] + tp_str + ["Controller"] + tp_str,
@@ -951,7 +1128,7 @@ def scrap_bytes_from_controller(filename):
     counter = 0
     local_res = []
     for line in lines:
-        if line.split()[-6] == "Total":
+        if line.split()[-3] == "Total":
             if int(line.split()[-1]) >= 1000000:
                 local_res.append(int(line.split()[-1]))
             counter += 1
@@ -965,8 +1142,8 @@ def scrap_bytes_from_controller(filename):
 def controller_udp_bytes(cdf=False):
     # Total received. Packets: 2063, Bytes: 4607946
     baseline = 4607946
-    standard = scrap_bytes_from_controller("results_26_05/controller_without_dropper.txt")
-    controller = scrap_bytes_from_controller("results_26_05/controller_1024_dropper.txt")
+    standard = scrap_bytes_from_controller("results_18_05/standard_droper_output.txt")
+    controller = scrap_bytes_from_controller("results_18_05/controller_droper_output.txt")
     print(standard)
     print("---")
     print(controller)
@@ -1010,14 +1187,16 @@ def controller_udp_bytes(cdf=False):
         ax.plot(bin_edges_without[1:], cdf_without_filtered, label="Standard", color="red", linestyle="-")
         ax.plot(bin_edges_with[1:], cdf_rfc_filtered, label="Controller", color="darkblue", linestyle="-.")
 
-        ax.set_xlabel("Data sent compared to the UDP baseline (i.e. without loss) [%]")
-        ax.set_ylabel("CDF")
+        ax.set_xlabel("Bytes sent compared to the UDP baseline (i.e. without loss) [%]")
+        ax.set_ylabel("ECDF")
         plt.legend()
         plt.ylim((0, 1))
 
         # plt.title("Data sent by the MQTT clients (+ the UDP traffic)\nDepending on k and d from the Markov loss model")
         # plt.ylim((min_r, max_r))
-        plt.savefig("figures/udp_controller_bytes.svg")
+        # plt.savefig("figures/udp_controller_bytes.pgf")
+        plt.savefig("figures/udp_controller_bytes.pdf")
+        print("fig saved")
         plt.show()
 
 
@@ -1046,30 +1225,38 @@ def analyze_apache_benchmark_csv():
         y = data.values[:, 1]
         plt.plot(y, x, color="darkblue", linestyle=":")
     
-    plt.xlim((0, 500))
+    # plt.xlim((0, 500))
 
     plt.show()
 
 
-def scrap_ab_per_file(filename):
+def scrap_ab_per_file(filename, percentile=False):
     with open(filename, "r") as fd:
         lines = fd.readlines()
     for line in lines:
         tab = line.split()
-        if len(tab) < 4: continue
-        if tab[0] == "Time" and tab[2] == "request:":
-            return float(tab[3])
+        if percentile:
+            if len(tab) < 2: continue
+            if tab[0] == "80%": return float(tab[1])
+        else:
+            if len(tab) < 4: continue
+            if tab[0] == "Time" and tab[2] == "request:":
+                return float(tab[3])
 
 
-def scrap_ab_big(filename):
+def scrap_ab_big(filename, percentile=False):
     total = []
     with open(filename, "r") as fd:
         lines = fd.readlines()
     for line in lines:
         tab = line.split()
-        if len(tab) < 4: continue
-        if tab[0] == "Time" and tab[2] == "request:" and float(tab[3]) > 50:
-            total.append(float(tab[3]))
+        if percentile:
+            if len(tab) < 2: continue
+            if tab[0] == "80%": total.append(float(tab[1]))
+        else:
+            if len(tab) < 4: continue
+            if tab[0] == "Time" and tab[2] == "request:" and float(tab[3]) > 50:
+                total.append(float(tab[3]))
     return total
 
 
@@ -1084,61 +1271,155 @@ def analyze_apache_benchmark_scrap():
     time_without = []
     time_rlc_4_2 = []
 
+    mean_without = []
+    mean_rlc_4_2 = []
+
     for filename in sorted_filenames_without:
-        val = scrap_ab_per_file(os.path.join(dir_without, filename))
+        val = scrap_ab_per_file(os.path.join(dir_without, filename), True)
         if val is not None:
             time_without.append(val)
+        val = scrap_ab_per_file(os.path.join(dir_without, filename), False)
+        if val is not None:
+            mean_without.append(val)
     
-    time_rlc_4_2 = scrap_ab_big(dir_rlc_4_2)
-
-    print(time_without)
+    time_rlc_4_2 = scrap_ab_big(dir_rlc_4_2, True)
+    mean_rlc_4_2 = scrap_ab_big(dir_rlc_4_2, False)
+    print(len(time_rlc_4_2), len(time_without))
 
     min_x = min([min(time_without), min(time_rlc_4_2)])
     max_x = max([max(time_without), max(time_rlc_4_2)])
-    max_x = 330
 
-    hist_without, bin_edges_without = np.histogram(time_without, bins=10000, range=(min_x - 0.5, max_x + 0.5), density=True)
-    hist_rlc, bin_edges_rlc = np.histogram(time_rlc_4_2, bins=10000, range=(min_x - 0.5, max_x + 0.5), density=True)
+    hist_without, bin_edges_without = np.histogram(time_without, bins=10000, range=(min(time_without), max(time_without) + 1), density=True)
+    hist_rlc, bin_edges_rlc = np.histogram(time_rlc_4_2, bins=10000, range=(min(time_rlc_4_2), max(time_rlc_4_2) + 1), density=True)
     dx = bin_edges_without[1] - bin_edges_without[0]
     cdf_without = np.cumsum(hist_without) * dx
+    dx = bin_edges_rlc[1] - bin_edges_rlc[0]
     cdf_rlc = np.cumsum(hist_rlc) * dx
 
+    # Mean
+    hist_without_mean, bin_edges_without_mean = np.histogram(mean_without, bins=10000, range=(min(mean_without), max(mean_without) + 1), density=True)
+    hist_rlc_mean, bin_edges_rlc_mean = np.histogram(mean_rlc_4_2, bins=10000, range=(min(mean_rlc_4_2), max(mean_rlc_4_2) + 1), density=True)
+    dx = bin_edges_without_mean[1] - bin_edges_without_mean[0]
+    cdf_without_mean = np.cumsum(hist_without_mean) * dx
+    dx = bin_edges_rlc_mean[1] - bin_edges_rlc_mean[0]
+    cdf_rlc_mean = np.cumsum(hist_rlc_mean) * dx
+
     # Dummy values
-    cdf_rlc = np.insert(cdf_rlc, 0, 0)
-    cdf_without = np.insert(cdf_without, 0, 0)
-    bin_edges_rlc = [0] + bin_edges_rlc
-    bin_edges_without = [0] + bin_edges_without
+    #cdf_rlc = np.insert(cdf_rlc, 0, 0)
+    #cdf_without = np.insert(cdf_without, 0, 0)
+    #bin_edges_rlc = [0] + bin_edges_rlc
+    #bin_edges_without = [0] + bin_edges_without
 
     fig, ax = plt.subplots()
     ax.grid()
     ax.set_axisbelow(True)
 
-    ax.plot(bin_edges_without, cdf_without, color="red", label="TCP")
-    ax.plot(bin_edges_rlc, cdf_rlc, color="darkblue", label="RLC_4_2")
+    wm, = ax.plot(bin_edges_without_mean[1:], cdf_without_mean, color="red", label=r"TCP")
+    rm, = ax.plot(bin_edges_rlc_mean[1:], cdf_rlc_mean, color="darkblue", label=r"RLC", linestyle="-.")
+    wp, = ax.plot(bin_edges_without[1:], cdf_without, color="darkgoldenrod", label=r"TCP", linestyle="--")
+    rp, = ax.plot(bin_edges_rlc[1:], cdf_rlc, color="royalblue", label=r"RLC", linestyle=":")
 
-    plt.ylabel("CDF")
-    plt.xlabel("Average time per request")
+    # Dummy plot
+    p5, = plt.plot(100, 0, marker='None',
+        linestyle='None', label=r'dummy-tophead')
+    leg3 = plt.legend([p5] + [wm, rm] + [p5] + [wp, rp],
+                [r"Mean"] + [r"TCP", r"RLC"] + [r"80%"] + [r"TCP", r"RLC"],
+                loc="best", ncol=2) # Two columns, vertical group labels
+
+    plt.ylabel(r"ECDF")
+    plt.xlabel(r"Time per request [ms]")
     # plt.tight_layout()
     # plt.gca().xaxis.set_major_formatter(PercentFormatter(1))
+    plt.savefig("figures/exp_ab_latency_cdf.pgf")
+    # plt.show()
 
-    plt.legend(loc="best")
-    plt.savefig("figures/exp_ab_latency_cdf.svg")
-    plt.show()
 
-    plt.show()
+def read_tcp_json(filename, retr=False):
+    with open(filename, "r") as fd:
+        data = json.load(fd)
+    res = []
+    for run in data:
+        if retr:
+            res.append(run["end"]["sum_sent"]["retransmits"])
+        else:
+            res.append(run["end"]["sum_received"]["end"])
+    return res
+
+
+def read_tcp_txt(filename, retr=False):
+    with open(filename, "r") as fd:
+        lines = fd.readlines()
+    res = []
+    for line in lines:
+        tab = line.split()
+        if len(tab) > 0:
+            if retr:
+                if tab[-1] == "sender":
+                    res.append(int(tab[-2]))
+            else:
+                if tab[-1] == "receiver":
+                    res.append(float(tab[2].split("-")[1]))
+    return res
+
+
+def tcp_quality_cdf_2(retr=False):
+    filename_without = "results_02_06/without.json"
+    filename_rlc_8_2 = "results_02_06/rlc_8_2.json"
+
+    res_without = read_tcp_json(filename_without, retr)
+    res_rlc_8_2 = read_tcp_txt(filename_rlc_8_2, retr)
+    
+    # Add rest of the values assuming that they are above the max value
+    without_max = max(res_without)
+    if retr:
+        for _ in range(len(res_without), 260): res_without.append(without_max + 10)
+        hist_without, bin_edges_without = np.histogram(res_without, bins=20000, range=(min(res_without), max(res_without) + 1), density=True)
+        hist_with, bin_edges_with = np.histogram(res_rlc_8_2, bins=20000, range=(min(res_rlc_8_2), max(res_rlc_8_2) + 1), density=True)
+    else:
+        for _ in range(len(res_without), 260): res_without.append(without_max * 1.1)
+        hist_without, bin_edges_without = np.histogram(res_without, bins=20000, range=(min(res_without), max(res_without) + 1), density=True)
+        hist_with, bin_edges_with = np.histogram(res_rlc_8_2, bins=20000, range=(min(res_rlc_8_2), max(res_rlc_8_2) + 1), density=True)
+    dx = bin_edges_without[1] - bin_edges_without[0]
+    cdf_without = np.cumsum(hist_without) * dx
+    dx = bin_edges_with[1] - bin_edges_with[0]
+    cdf_with = np.cumsum(hist_with) * dx
+
+    fig, ax = plt.subplots()
+
+    ax.grid()
+    ax.set_axisbelow(True)
+
+    ax.plot(bin_edges_without[1:], cdf_without, label="TCP", color="red", linestyle="-")
+    ax.plot(bin_edges_with[1:], cdf_with, label="RLC", color="darkblue", linestyle="-.")
+
+    if retr:
+        ax.set_xlabel("Number of retransmissions")
+    else:
+        ax.set_xlabel("Connection time [s]")
+    ax.set_ylabel("ECDF")
+
+    plt.xlim((0, without_max))
+    plt.legend()
+    if retr:
+        plt.savefig("figures/tcp_retr_cdf.pgf")
+    else:
+        plt.savefig("figures/tcp_time_cdf.pgf")
+    
+    # plt.show()
 
 
 if __name__ == "__main__":
-    # plugin_overhead()
+    # plugin_overhead_slides()
     # analyze_tpc_congestion_window_all(scrap_cw, boxplot=True)
-    # analyze_udp_loss(cdf=True, boxplot=True)
+    # analyze_udp_loss(cdf=True, boxplot=False)
     # analyze_tcp_quality()
+    # tcp_quality_cdf_2(False)
     # analyze_retransmission()
-    # analyze_udp_traffic(cdf=True, jitter=False)
+    analyze_udp_traffic(cdf=True, jitter=False)
     # rlc_vs_udp()
     # analyze_controller()
     # controller_by_k()
     # analyze_controller_udp_traffic(cdf=True)  # Loss
     # controller_udp_bytes(cdf=True)
-    analyze_apache_benchmark_scrap()
+    # analyze_apache_benchmark_scrap()
     # analyze_apache_benchmark_csv()

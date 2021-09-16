@@ -79,7 +79,7 @@ try:
                 
                     # Start dropper
                     # SIGCOMM: adapt to find the file
-                    dropper = net["rD"].pexec(f"python3 /vagrant/ebpf_dropper/attach_markov.py --ips 204200dd00000000,0000000000000001,fc00000000000000,0000000000000009 --attach rD-eth1 --attach-ingress -k {k} -d {d} --no-update")
+                    dropper = net["rD"].pexec(f"python3 /vagrant/ebpf_dropper/attach_markov.py --ips 204200dd00000000,0000000000000001,fc00000000000000,0000000000000009 --attach rD-eth1 --attach-ingress -k {k} -d {d}")
                     print(dropper)
 
                     # Wait for the plugins and dropper to start
@@ -96,7 +96,7 @@ try:
                     encoder.terminate()
                     decoder.terminate()
                     tcpdump.terminate()
-                    net["rD"].pexec("python3 attach_markov.py --ips 204200dd00000000,0000000000000001,fc00000000000000,0000000000000009 --attach rD-eth1 --attach-ingress --no-update --clean")
+                    net["rD"].pexec("python3 attach_markov.py --ips 204200dd00000000,0000000000000001,fc00000000000000,0000000000000009 --attach rD-eth1 --attach-ingress --clean")
                     if run < 2: fd.write(",")
                     i += 1
                 fd.write("]")

@@ -1,0 +1,221 @@
+          <idle>-0       [001] ..s. 13968.584586: 0: Total received packets: 5206 bytes: 933468
+          <idle>-0       [001] ..s. 13968.584602: 0: Droper: updated the params to k=990, d=50
+          <idle>-0       [001] ..s. 13978.399060: 0: Total received packets: 5206 bytes: 933468
+          <idle>-0       [001] ..s. 13978.399062: 0: Droper: updated the params to k=990, d=100
+     ksoftirqd/1-18      [001] ..s. 13988.022801: 0: Total received packets: 5211 bytes: 933842
+     ksoftirqd/1-18      [001] ..s. 13988.022804: 0: Droper: updated the params to k=990, d=150
+          <idle>-0       [001] ..s. 13999.504839: 0: Total received packets: 5210 bytes: 933766
+          <idle>-0       [001] ..s. 13999.504843: 0: Droper: updated the params to k=990, d=200
+     ksoftirqd/1-18      [001] ..s. 14009.481597: 0: Total received packets: 5320 bytes: 944828
+     ksoftirqd/1-18      [001] ..s. 14009.481600: 0: Droper: updated the params to k=990, d=250
+          <idle>-0       [001] ..s. 14019.441477: 0: Total received packets: 5325 bytes: 945327
+          <idle>-0       [001] ..s. 14019.441480: 0: Droper: updated the params to k=990, d=300
+          <idle>-0       [001] ..s. 14030.537916: 0: Total received packets: 5319 bytes: 944671
+          <idle>-0       [001] ..s. 14030.537919: 0: Droper: updated the params to k=990, d=350
+          <idle>-0       [000] ..s. 14043.572876: 0: Total received packets: 5346 bytes: 947650
+          <idle>-0       [000] ..s. 14043.572878: 0: Droper: updated the params to k=990, d=400
+          <idle>-0       [001] ..s. 14055.989698: 0: Total received packets: 5291 bytes: 942670
+          <idle>-0       [001] ..s. 14055.989700: 0: Droper: updated the params to k=990, d=450
+          <idle>-0       [001] ..s. 14068.812413: 0: Total received packets: 5440 bytes: 956756
+          <idle>-0       [001] ..s. 14068.812416: 0: Droper: updated the params to k=990, d=500
+          <idle>-0       [001] ..s. 14083.733525: 0: Total received packets: 5468 bytes: 959399
+          <idle>-0       [001] ..s. 14083.733529: 0: Droper: updated the params to k=980, d=0
+          <idle>-0       [001] ..s. 14096.528383: 0: Total received packets: 5323 bytes: 944944
+          <idle>-0       [001] ..s. 14096.528387: 0: Droper: updated the params to k=980, d=50
+          <idle>-0       [001] ..s. 14107.043517: 0: Total received packets: 5314 bytes: 944272
+          <idle>-0       [001] ..s. 14107.043520: 0: Droper: updated the params to k=980, d=100
+          <idle>-0       [000] ..s. 14118.604991: 0: Total received packets: 5327 bytes: 945454
+          <idle>-0       [000] ..s. 14118.604994: 0: Droper: updated the params to k=980, d=150
+          <idle>-0       [001] ..s. 14130.128918: 0: Total received packets: 5312 bytes: 944128
+          <idle>-0       [001] ..s. 14130.128920: 0: Droper: updated the params to k=980, d=200
+          <idle>-0       [001] ..s. 14141.289637: 0: Total received packets: 5437 bytes: 956426
+          <idle>-0       [001] ..s. 14141.289640: 0: Droper: updated the params to k=980, d=250
+          <idle>-0       [001] ..s. 14155.612560: 0: Total received packets: 5431 bytes: 955862
+          <idle>-0       [001] ..s. 14155.612563: 0: Droper: updated the params to k=980, d=300
+          <idle>-0       [001] ..s. 14166.750843: 0: Total received packets: 5420 bytes: 955057
+          <idle>-0       [001] ..s. 14166.750846: 0: Droper: updated the params to k=980, d=350
+          <idle>-0       [001] ..s. 14179.500352: 0: Total received packets: 5447 bytes: 956859
+          <idle>-0       [001] ..s. 14179.500354: 0: Droper: updated the params to k=980, d=400
+          <idle>-0       [001] ..s. 14191.091570: 0: Total received packets: 5446 bytes: 957731
+          <idle>-0       [001] ..s. 14191.091574: 0: Droper: updated the params to k=980, d=450
+          <idle>-0       [001] ..s. 14204.336749: 0: Total received packets: 5506 bytes: 965057
+          <idle>-0       [001] ..s. 14204.336752: 0: Droper: updated the params to k=980, d=500
+          <idle>-0       [001] ..s. 14217.164226: 0: Total received packets: 5596 bytes: 971671
+          <idle>-0       [001] ..s. 14217.164230: 0: Droper: updated the params to k=970, d=0
+          <idle>-0       [001] ..s. 14228.583795: 0: Total received packets: 5536 bytes: 966545
+          <idle>-0       [001] ..s. 14228.583799: 0: Droper: updated the params to k=970, d=50
+          <idle>-0       [001] ..s. 14242.824640: 0: Total received packets: 5502 bytes: 963458
+          <idle>-0       [001] ..s. 14242.824644: 0: Droper: updated the params to k=970, d=100
+          <idle>-0       [001] ..s. 14254.168817: 0: Total received packets: 5539 bytes: 966230
+          <idle>-0       [001] ..s. 14254.168820: 0: Droper: updated the params to k=970, d=150
+          <idle>-0       [001] ..s. 14268.776489: 0: Total received packets: 5519 bytes: 965013
+          <idle>-0       [001] ..s. 14268.776491: 0: Droper: updated the params to k=970, d=200
+          <idle>-0       [001] ..s. 14280.916078: 0: Total received packets: 5656 bytes: 978306
+          <idle>-0       [001] ..s. 14280.916081: 0: Droper: updated the params to k=970, d=250
+          <idle>-0       [001] ..s. 14293.808537: 0: Total received packets: 5643 bytes: 977168
+          <idle>-0       [001] ..s. 14293.808539: 0: Droper: updated the params to k=970, d=300
+          <idle>-0       [001] ..s. 14306.288215: 0: Total received packets: 5643 bytes: 977489
+          <idle>-0       [001] ..s. 14306.288218: 0: Droper: updated the params to k=970, d=350
+          <idle>-0       [000] ..s. 14321.362327: 0: Total received packets: 5655 bytes: 978340
+          <idle>-0       [000] ..s. 14321.362330: 0: Droper: updated the params to k=970, d=400
+          <idle>-0       [001] ..s. 14334.004073: 0: Total received packets: 5636 bytes: 976849
+          <idle>-0       [001] ..s. 14334.004077: 0: Droper: updated the params to k=970, d=450
+          <idle>-0       [001] ..s. 14349.007104: 0: Total received packets: 5796 bytes: 992428
+          <idle>-0       [001] ..s. 14349.007106: 0: Droper: updated the params to k=970, d=500
+          <idle>-0       [001] ..s. 14366.944639: 0: Total received packets: 6056 bytes: 1017965
+          <idle>-0       [001] ..s. 14366.944642: 0: Droper: updated the params to k=960, d=0
+          <idle>-0       [001] ..s. 14379.697873: 0: Total received packets: 5674 bytes: 979651
+          <idle>-0       [001] ..s. 14379.697876: 0: Droper: updated the params to k=960, d=50
+            sshd-1608    [001] ..s1 14393.466712: 0: Total received packets: 5619 bytes: 974809
+            sshd-1608    [001] ..s1 14393.466715: 0: Droper: updated the params to k=960, d=100
+          <idle>-0       [001] ..s. 14406.815265: 0: Total received packets: 5649 bytes: 977559
+          <idle>-0       [001] ..s. 14406.815268: 0: Droper: updated the params to k=960, d=150
+     ksoftirqd/1-18      [001] ..s. 14419.432850: 0: Total received packets: 5601 bytes: 973354
+     ksoftirqd/1-18      [001] ..s. 14419.432853: 0: Droper: updated the params to k=960, d=200
+          <idle>-0       [001] ..s. 14432.363780: 0: Total received packets: 5710 bytes: 984785
+          <idle>-0       [001] ..s. 14432.363783: 0: Droper: updated the params to k=960, d=250
+          <idle>-0       [001] ..s. 14448.019703: 0: Total received packets: 5721 bytes: 985514
+          <idle>-0       [001] ..s. 14448.019705: 0: Droper: updated the params to k=960, d=300
+          <idle>-0       [001] ..s. 14462.773457: 0: Total received packets: 5765 bytes: 989212
+          <idle>-0       [001] ..s. 14462.773460: 0: Droper: updated the params to k=960, d=350
+          <idle>-0       [001] ..s. 14476.710423: 0: Total received packets: 5717 bytes: 984994
+          <idle>-0       [001] ..s. 14476.710427: 0: Droper: updated the params to k=960, d=400
+     ksoftirqd/1-18      [001] ..s. 14490.551596: 0: Total received packets: 5765 bytes: 989447
+     ksoftirqd/1-18      [001] ..s. 14490.551599: 0: Droper: updated the params to k=960, d=450
+     ksoftirqd/1-18      [001] ..s. 14506.787053: 0: Total received packets: 5843 bytes: 998327
+     ksoftirqd/1-18      [001] ..s. 14506.787055: 0: Droper: updated the params to k=960, d=500
+          <idle>-0       [001] ..s. 14522.066998: 0: Total received packets: 6062 bytes: 1020693
+          <idle>-0       [001] ..s. 14522.067000: 0: Droper: updated the params to k=950, d=0
+          <idle>-0       [001] ..s. 14537.859246: 0: Total received packets: 5883 bytes: 1003472
+          <idle>-0       [001] ..s. 14537.859249: 0: Droper: updated the params to k=950, d=50
+          <idle>-0       [001] ..s. 14552.702912: 0: Total received packets: 5908 bytes: 1005183
+          <idle>-0       [001] ..s. 14552.702915: 0: Droper: updated the params to k=950, d=100
+          <idle>-0       [001] ..s. 14567.071353: 0: Total received packets: 5848 bytes: 999869
+          <idle>-0       [001] ..s. 14567.071356: 0: Droper: updated the params to k=950, d=150
+          <idle>-0       [001] ..s. 14581.838866: 0: Total received packets: 6001 bytes: 1015241
+          <idle>-0       [001] ..s. 14581.838868: 0: Droper: updated the params to k=950, d=200
+          <idle>-0       [001] ..s. 14599.125909: 0: Total received packets: 6045 bytes: 1021624
+          <idle>-0       [001] ..s. 14599.125912: 0: Droper: updated the params to k=950, d=250
+          <idle>-0       [000] ..s. 14616.250644: 0: Total received packets: 6038 bytes: 1021064
+          <idle>-0       [000] ..s. 14616.250648: 0: Droper: updated the params to k=950, d=300
+          <idle>-0       [000] ..s. 14631.429905: 0: Total received packets: 6121 bytes: 1027182
+          <idle>-0       [000] ..s. 14631.429908: 0: Droper: updated the params to k=950, d=350
+          <idle>-0       [000] ..s. 14647.949898: 0: Total received packets: 6087 bytes: 1025328
+          <idle>-0       [000] ..s. 14647.949901: 0: Droper: updated the params to k=950, d=400
+     ksoftirqd/0-10      [000] ..s. 14666.194241: 0: Total received packets: 6217 bytes: 1038749
+     ksoftirqd/0-10      [000] ..s. 14666.194244: 0: Droper: updated the params to k=950, d=450
+     ksoftirqd/0-10      [000] ..s. 14686.758502: 0: Total received packets: 6270 bytes: 1048094
+     ksoftirqd/0-10      [000] ..s. 14686.758504: 0: Droper: updated the params to k=950, d=500
+     ksoftirqd/0-10      [000] ..s. 14709.289931: 0: Total received packets: 6418 bytes: 1063893
+     ksoftirqd/0-10      [000] ..s. 14709.289934: 0: Droper: updated the params to k=940, d=0
+          <idle>-0       [000] ..s. 14726.450057: 0: Total received packets: 6003 bytes: 1017767
+          <idle>-0       [000] ..s. 14726.450059: 0: Droper: updated the params to k=940, d=50
+          <idle>-0       [000] ..s. 14742.794071: 0: Total received packets: 6035 bytes: 1019829
+          <idle>-0       [000] ..s. 14742.794074: 0: Droper: updated the params to k=940, d=100
+          <idle>-0       [000] ..s. 14760.304786: 0: Total received packets: 6038 bytes: 1021368
+          <idle>-0       [000] ..s. 14760.304789: 0: Droper: updated the params to k=940, d=150
+          <idle>-0       [000] ..s. 14780.153666: 0: Total received packets: 6087 bytes: 1026681
+          <idle>-0       [000] ..s. 14780.153670: 0: Droper: updated the params to k=940, d=200
+     ksoftirqd/0-10      [000] ..s. 14798.773096: 0: Total received packets: 6254 bytes: 1044086
+     ksoftirqd/0-10      [000] ..s. 14798.773098: 0: Droper: updated the params to k=940, d=250
+          <idle>-0       [000] ..s. 14818.633785: 0: Total received packets: 6254 bytes: 1042423
+          <idle>-0       [000] ..s. 14818.633788: 0: Droper: updated the params to k=940, d=300
+          <idle>-0       [000] ..s. 14839.469066: 0: Total received packets: 6323 bytes: 1051940
+          <idle>-0       [000] ..s. 14839.469068: 0: Droper: updated the params to k=940, d=350
+          <idle>-0       [000] ..s. 14860.431973: 0: Total received packets: 6329 bytes: 1052412
+          <idle>-0       [000] ..s. 14860.431975: 0: Droper: updated the params to k=940, d=400
+          <idle>-0       [000] ..s. 14880.419377: 0: Total received packets: 6371 bytes: 1058030
+          <idle>-0       [000] ..s. 14880.419379: 0: Droper: updated the params to k=940, d=450
+          <idle>-0       [000] ..s. 14900.992255: 0: Total received packets: 6532 bytes: 1075745
+          <idle>-0       [000] ..s. 14900.992258: 0: Droper: updated the params to k=940, d=500
+          <idle>-0       [000] ..s. 14922.345017: 0: Total received packets: 6500 bytes: 1077884
+          <idle>-0       [000] ..s. 14922.345020: 0: Droper: updated the params to k=930, d=0
+          <idle>-0       [000] ..s. 14940.440598: 0: Total received packets: 6063 bytes: 1022389
+          <idle>-0       [000] ..s. 14940.440601: 0: Droper: updated the params to k=930, d=50
+          <idle>-0       [000] ..s. 14956.723743: 0: Total received packets: 6040 bytes: 1021092
+          <idle>-0       [000] ..s. 14956.723745: 0: Droper: updated the params to k=930, d=100
+          <idle>-0       [000] ..s. 14973.868508: 0: Total received packets: 6078 bytes: 1023826
+          <idle>-0       [000] ..s. 14973.868511: 0: Droper: updated the params to k=930, d=150
+     ksoftirqd/0-10      [000] ..s. 14991.136480: 0: Total received packets: 6141 bytes: 1031119
+     ksoftirqd/0-10      [000] ..s. 14991.136483: 0: Droper: updated the params to k=930, d=200
+          <idle>-0       [000] ..s. 15009.999585: 0: Total received packets: 6146 bytes: 1032382
+          <idle>-0       [000] ..s. 15009.999587: 0: Droper: updated the params to k=930, d=250
+          <idle>-0       [000] ..s. 15028.811739: 0: Total received packets: 6189 bytes: 1035910
+          <idle>-0       [000] ..s. 15028.811742: 0: Droper: updated the params to k=930, d=300
+          <idle>-0       [000] ..s. 15048.095015: 0: Total received packets: 6156 bytes: 1034130
+          <idle>-0       [000] ..s. 15048.095018: 0: Droper: updated the params to k=930, d=350
+          <idle>-0       [000] ..s. 15066.954682: 0: Total received packets: 6249 bytes: 1043372
+          <idle>-0       [000] ..s. 15066.954685: 0: Droper: updated the params to k=930, d=400
+          <idle>-0       [000] ..s. 15085.563698: 0: Total received packets: 6234 bytes: 1044071
+          <idle>-0       [000] ..s. 15085.563701: 0: Droper: updated the params to k=930, d=450
+          <idle>-0       [000] ..s. 15107.274601: 0: Total received packets: 6322 bytes: 1053926
+          <idle>-0       [000] ..s. 15107.274604: 0: Droper: updated the params to k=930, d=500
+          <idle>-0       [000] ..s. 15127.122074: 0: Total received packets: 6341 bytes: 1055245
+          <idle>-0       [000] ..s. 15127.122078: 0: Droper: updated the params to k=920, d=0
+          <idle>-0       [000] ..s. 15145.294815: 0: Total received packets: 6139 bytes: 1031843
+          <idle>-0       [000] ..s. 15145.294817: 0: Droper: updated the params to k=920, d=50
+          <idle>-0       [000] ..s. 15162.153985: 0: Total received packets: 6181 bytes: 1035095
+          <idle>-0       [000] ..s. 15162.153988: 0: Droper: updated the params to k=920, d=100
+          <idle>-0       [000] ..s. 15181.404981: 0: Total received packets: 6150 bytes: 1033226
+          <idle>-0       [000] ..s. 15181.404984: 0: Droper: updated the params to k=920, d=150
+          <idle>-0       [000] ..s. 15200.942740: 0: Total received packets: 6271 bytes: 1047480
+          <idle>-0       [000] ..s. 15200.942743: 0: Droper: updated the params to k=920, d=200
+     ksoftirqd/0-10      [000] ..s. 15222.197199: 0: Total received packets: 6294 bytes: 1050207
+     ksoftirqd/0-10      [000] ..s. 15222.197202: 0: Droper: updated the params to k=920, d=250
+     ksoftirqd/0-10      [000] ..s. 15242.053743: 0: Total received packets: 6210 bytes: 1042704
+     ksoftirqd/0-10      [000] ..s. 15242.053746: 0: Droper: updated the params to k=920, d=300
+          <idle>-0       [000] ..s. 15262.656112: 0: Total received packets: 6356 bytes: 1056991
+          <idle>-0       [000] ..s. 15262.656115: 0: Droper: updated the params to k=920, d=350
+          <idle>-0       [000] ..s. 15281.377102: 0: Total received packets: 6356 bytes: 1057449
+          <idle>-0       [000] ..s. 15281.377105: 0: Droper: updated the params to k=920, d=400
+          <idle>-0       [000] ..s. 15302.016139: 0: Total received packets: 6359 bytes: 1060826
+          <idle>-0       [000] ..s. 15302.016141: 0: Droper: updated the params to k=920, d=450
+          <idle>-0       [000] ..s. 15322.836357: 0: Total received packets: 6396 bytes: 1065213
+          <idle>-0       [000] ..s. 15322.836360: 0: Droper: updated the params to k=920, d=500
+          <idle>-0       [000] ..s. 15349.604615: 0: Total received packets: 6809 bytes: 1118903
+          <idle>-0       [000] ..s. 15349.604618: 0: Droper: updated the params to k=910, d=0
+          <idle>-0       [000] ..s. 15367.427995: 0: Total received packets: 6280 bytes: 1048302
+          <idle>-0       [000] ..s. 15367.427998: 0: Droper: updated the params to k=910, d=50
+          <idle>-0       [000] ..s. 15385.979221: 0: Total received packets: 6245 bytes: 1044561
+          <idle>-0       [000] ..s. 15385.979224: 0: Droper: updated the params to k=910, d=100
+          <idle>-0       [000] ..s. 15407.183031: 0: Total received packets: 6307 bytes: 1053795
+          <idle>-0       [000] ..s. 15407.183035: 0: Droper: updated the params to k=910, d=150
+     ksoftirqd/0-10      [000] ..s. 15428.552131: 0: Total received packets: 6320 bytes: 1056507
+     ksoftirqd/0-10      [000] ..s. 15428.552134: 0: Droper: updated the params to k=910, d=200
+     ksoftirqd/0-10      [000] ..s. 15452.494967: 0: Total received packets: 6419 bytes: 1066059
+     ksoftirqd/0-10      [000] ..s. 15452.494970: 0: Droper: updated the params to k=910, d=250
+     ksoftirqd/0-10      [000] ..s. 15474.495058: 0: Total received packets: 6369 bytes: 1060180
+     ksoftirqd/0-10      [000] ..s. 15474.495061: 0: Droper: updated the params to k=910, d=300
+     ksoftirqd/0-10      [000] ..s. 15495.026694: 0: Total received packets: 6332 bytes: 1060541
+     ksoftirqd/0-10      [000] ..s. 15495.026696: 0: Droper: updated the params to k=910, d=350
+          <idle>-0       [000] ..s. 15517.294843: 0: Total received packets: 6441 bytes: 1069762
+          <idle>-0       [000] ..s. 15517.294845: 0: Droper: updated the params to k=910, d=400
+          <idle>-0       [000] ..s. 15541.413356: 0: Total received packets: 6515 bytes: 1086387
+          <idle>-0       [000] ..s. 15541.413359: 0: Droper: updated the params to k=910, d=450
+          <idle>-0       [000] ..s. 15567.742458: 0: Total received packets: 6591 bytes: 1094335
+          <idle>-0       [000] ..s. 15567.742462: 0: Droper: updated the params to k=910, d=500
+          <idle>-0       [000] ..s. 15606.785824: 0: Total received packets: 7191 bytes: 1171776
+          <idle>-0       [000] ..s. 15606.785827: 0: Droper: updated the params to k=900, d=0
+          <idle>-0       [000] ..s. 15626.638065: 0: Total received packets: 6326 bytes: 1057570
+          <idle>-0       [000] ..s. 15626.638067: 0: Droper: updated the params to k=900, d=50
+          <idle>-0       [000] ..s. 15646.516559: 0: Total received packets: 6391 bytes: 1063332
+          <idle>-0       [000] ..s. 15646.516562: 0: Droper: updated the params to k=900, d=100
+     ksoftirqd/0-10      [000] ..s. 15670.309447: 0: Total received packets: 6414 bytes: 1067009
+     ksoftirqd/0-10      [000] ..s. 15670.309449: 0: Droper: updated the params to k=900, d=150
+          <idle>-0       [000] ..s. 15694.496259: 0: Total received packets: 6413 bytes: 1070899
+          <idle>-0       [000] ..s. 15694.496262: 0: Droper: updated the params to k=900, d=200
+     ksoftirqd/0-10      [000] ..s. 15716.913306: 0: Total received packets: 6476 bytes: 1074736
+     ksoftirqd/0-10      [000] ..s. 15716.913308: 0: Droper: updated the params to k=900, d=250
+     ksoftirqd/0-10      [000] ..s. 15739.381278: 0: Total received packets: 6408 bytes: 1068135
+     ksoftirqd/0-10      [000] ..s. 15739.381281: 0: Droper: updated the params to k=900, d=300
+          <idle>-0       [000] ..s. 15760.743698: 0: Total received packets: 6521 bytes: 1079620
+          <idle>-0       [000] ..s. 15760.743701: 0: Droper: updated the params to k=900, d=350
+          <idle>-0       [000] ..s. 15788.455433: 0: Total received packets: 6468 bytes: 1076837
+          <idle>-0       [000] ..s. 15788.455436: 0: Droper: updated the params to k=900, d=400
+          <idle>-0       [000] ..s. 15814.683510: 0: Total received packets: 6621 bytes: 1101082
+          <idle>-0       [000] ..s. 15814.683514: 0: Droper: updated the params to k=900, d=450
+          <idle>-0       [000] ..s. 15843.075453: 0: Total received packets: 6675 bytes: 1111428
+          <idle>-0       [000] ..s. 15843.075456: 0: Droper: updated the params to k=900, d=500
+          <idle>-0       [000] ..s. 15877.654426: 0: Total received packets: 7229 bytes: 1182909
+          <idle>-0       [000] ..s. 15877.654429: 0: Droper: /!\ already in this state
+          <idle>-0       [000] ..s. 15877.654431: 0: Droper: updated the params to k=900, d=0

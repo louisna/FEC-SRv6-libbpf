@@ -3,7 +3,7 @@
 
 #define TLV_CODING_SOURCE 28
 #define TLV_CODING_REPAIR 29
-#define MAX_PACKET_SIZE 512
+#define MAX_PACKET_SIZE 65536
 
 #define my_memset(ptr, size) ({\
     __u64 *____ptr_64 = (__u64 *)ptr;\

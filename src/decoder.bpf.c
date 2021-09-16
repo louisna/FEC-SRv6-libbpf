@@ -1,5 +1,5 @@
-#ifndef BPF_H_
-#define BPF_H_
+#ifndef LINUX_BPF_H_
+#define LINUX_BPF_H_
 #include <linux/bpf.h>
 #endif
 #ifndef BPF_HELPERS_H_

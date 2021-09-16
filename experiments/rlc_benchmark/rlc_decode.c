@@ -7,8 +7,6 @@
 #define __u16 uint16_t
 #define __u32 uint32_t
 
-#define MAX(a, b) a > b ? a : b
-
 #include "../../src/fec_scheme/window_rlc_gf256/rlc_gf256_decode.c"
 
 static uint16_t get_prng_length(tinymt32_t *prng, uint16_t seed) {
@@ -17,7 +15,7 @@ static uint16_t get_prng_length(tinymt32_t *prng, uint16_t seed) {
     return MAX(length, 100);
 }
 
-int call_rlc__fec_recover(uint8_t window_size, uint8_t window_step, uint8_t repetitions, uint8_t nb_window) {
+int call_rlc__fec_recover(uint8_t window_size, uint8_t window_step, uint8_t repetitions, uint8_t nb_window, uint8_t nb_lost_sym) {
     fecConvolution_t *fecConvolution = malloc(sizeof(fecConvolution_t));
     if (!fecConvolution) return -1;
 
@@ -77,7 +75,7 @@ int call_rlc__fec_recover(uint8_t window_size, uint8_t window_step, uint8_t repe
         tlv->len = sizeof(struct tlvRepair__convo_t) - 2;
         tlv->controller_update = 0;
         tlv->encodingSymbolID = idx;
-        tlv->repairFecInfo = (15 << (16 + 8)) + (window_step << 16) + 0;
+        tlv->repairFecInfo = (15 << (16 + 8)) + (window_step << 16) + i;
         tlv->coded_payload_len = 41; // Hope this will not give troubles
         tlv->nss = window_size;
         tlv->nrs = 1;
@@ -91,9 +89,10 @@ int call_rlc__fec_recover(uint8_t window_size, uint8_t window_step, uint8_t repe
     }
 
     // Add losses: the decoder considers a source symbol as lost if the encodingSymbolID is wront
-    int losses[] = {1, 5, 6, 9, 11};
-    for (int i = 0; i < 5; ++i) {
-        source_symbol_t *sourceSymbol = &fecConvolution->sourceRingBuffer[losses[i]];
+    int losses[] = {14, 1, 5, 6, 9, 11, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 68, 70};
+    //int losses[] = {14};
+    for (int i = 0; i < nb_lost_sym; ++i) {
+        source_symbol_t *sourceSymbol = &fecConvolution->sourceRingBuffer[total_source_symbols - 1 - i * 2];
         struct tlvSource__convo_t *tlv = (struct tlvSource__convo_t *)&sourceSymbol->tlv;
         tlv->encodingSymbolID = 0;
     }
@@ -129,26 +128,27 @@ int call_rlc__fec_recover(uint8_t window_size, uint8_t window_step, uint8_t repe
     printf("]\n");
 
     free(fecConvolution);
-    free(decode_rlc);
+    free_rlc_decode(decode_rlc);
     return 0;
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 4) {
-        fprintf(stderr, "Need 3 arguments\n");
+    if (argc < 5) {
+        fprintf(stderr, "Need 4 arguments\n");
         return -1;
     }
     int window_size = atoi(argv[1]);
     int window_step = atoi(argv[2]);
     int repetitions = atoi(argv[3]);
-    if (window_size <= 0 || window_step <= 0 || repetitions <= 0) {
+    int nb_lost_sym = atoi(argv[4]);
+    if (window_size <= 0 || window_step <= 0 || repetitions <= 0 || nb_lost_sym < 0) {
         fprintf(stderr, "Give correct values !\n");
         return -1;
     }
-    if (window_size > MAX_RLC_WINDOW_SIZE || window_step > MAX_RLC_WINDOW_SLIDE) {
+    if (window_size > MAX_RLC_WINDOW_SIZE || window_step > MAX_RLC_WINDOW_SLIDE || nb_lost_sym > 50) {
         fprintf(stderr, "Give values in ranges\n");
         return -1;
     }
-    printf("%d\n", call_rlc__fec_recover(window_size, window_step, repetitions, 5));
+    call_rlc__fec_recover(window_size, window_step, repetitions, nb_lost_sym, nb_lost_sym);
     return 0;
 }

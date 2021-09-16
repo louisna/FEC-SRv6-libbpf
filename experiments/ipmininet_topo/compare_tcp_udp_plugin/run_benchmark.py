@@ -95,24 +95,24 @@ if args.tcp_quality == 0:
         time.sleep(1)
     os.system(f"echo ] {output_dir}")
 else:
-    output_dir_template = lambda: f" >> {args.output}/mqt_res_run_10_{i}.json"
-    bench_template = f"iperf3 --client 2042:dd::1 --bytes {args.tcp_quality} -M 280 -b {args.b}"
-    print(bench_template)
+    output_dir_template = lambda: f"{args.output}.json"
+    bench_template = f"iperf3 --client 2042:dd::1 --bytes {args.tcp_quality} -M 280"
+    output_dir = "" if args.output is None else output_dir_template()
     scapy_args = Crafting(verbose=False, source="2042:aa::1", destination=update_destination, port=3333)
-
-    for i in range(1):
+    #os.system(f"echo [ >> {output_dir}")
+    for i in range(260):
         print(i)
-        output_dir = "" if args.output is None else output_dir_template()
-        if len(output_dir) > 0: os.system(f"echo [ {output_dir}")
-        command = f"{bench_template} {output_dir}"
+        # if len(output_dir) > 0: os.system(f"echo [ {output_dir}")
+        command = f"{bench_template} "#>> {output_dir}"
         for j in range(1):
             os.system(command)
             if j < 2:
-                if len(output_dir) > 0: os.system(f"echo , {output_dir}")
+                #if len(output_dir) > 0: os.system(f"echo , {output_dir}")
                 pass
-        if len(output_dir) > 0: os.system(f"echo ] {output_dir}")
+        #if i < 259: os.system(f"echo , >> {output_dir}")
 
         pkt = craft_srv6_packet(scapy_args, "zzzzzzzzzzz")
-        # send(pkt)
+        send(pkt)
         print("Sent update packet !")
         time.sleep(0.1)
+    #os.system(f"echo ] >> {output_dir}")
