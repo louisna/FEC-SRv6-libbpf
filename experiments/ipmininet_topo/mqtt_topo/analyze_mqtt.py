@@ -846,30 +846,38 @@ def analyze_latency_reproducible_slides():
     plt.show()
 
 
-def analyze_latency_4_only():
-    filenames_without = "results_15_09/payload_100/without/mqtt_res_run_10.json"
-    filenames_rlc_2_4 = "results_15_09/payload_100/rlc_4_2/mqtt_res_run_10.json"
+def analyze_latency_4_only(is_100=False):
+    if is_100: s = "payload_100/"
+    else: s = ""
+    filenames_without = f"results_15_09/{s}without/mqtt_res_run_10.json"
+    filenames_rlc_2_4 = f"results_15_09/{s}rlc_4_2/mqtt_res_run_10.json"
+    filenames_rlc_2_8 = f"results_15_09/{s}rlc_8_2/mqtt_res_run_10.json"
     # print(filenames_without)
 
     res_without = mqtt_scrap_big(filenames_without)
     res_rlc_2_4 = mqtt_scrap_big(filenames_rlc_2_4)
+    res_rlc_2_8 = mqtt_scrap_big(filenames_rlc_2_8)
 
     # Everything is in the same file
 
-    min_r = min([min(res_without), min(res_rlc_2_4)]) - 1
-    max_r = max([max(res_without), max(res_rlc_2_4)]) + 1
-    min_max_r = max(res_rlc_2_4)
+    min_r = min([min(res_without), min(res_rlc_2_4), min(res_rlc_2_8)]) - 1
+    max_r = max([max(res_without), max(res_rlc_2_4), max(res_rlc_2_8)]) + 1
+    min_max_r = min(max(res_rlc_2_4), max(res_rlc_2_8))
     print(min_max_r, min_r + 1)
     hist_without, bin_edges_without = np.histogram(res_without, bins=5000, range=(min(res_without), max(res_without) + 1), density=True)
     hist_rlc_2_4, bin_edges_rlc_2_4 = np.histogram(res_rlc_2_4, bins=5000, range=(min(res_rlc_2_4), max(res_rlc_2_4) + 1), density=True)
+    hist_rlc_2_8, bin_edges_rlc_2_8 = np.histogram(res_rlc_2_8, bins=5000, range=(min(res_rlc_2_8), max(res_rlc_2_8) + 1), density=True)
     dx = bin_edges_without[1] - bin_edges_without[0]
     cdf_without = np.cumsum(hist_without) * dx
     dx = bin_edges_rlc_2_4[1] - bin_edges_rlc_2_4[0]
     cdf_rlc_2_4 = np.cumsum(hist_rlc_2_4) * dx
+    dx = bin_edges_rlc_2_8[1] - bin_edges_rlc_2_8[0]
+    cdf_rlc_2_8 = np.cumsum(hist_rlc_2_8) * dx
 
     fig, ax = plt.subplots(figsize=(8, 3.5))  # figsize=(5, 2)
     # plt.rcParams["font.family"] = "calibri"
     ax.plot(bin_edges_without[1:], cdf_without, label="TCP", color="red", linestyle="-", linewidth=3)
+    ax.plot(bin_edges_rlc_2_8[1:], cdf_rlc_2_8, label="RLC 8 2", color="green", linestyle="-", linewidth=3)
     ax.plot(bin_edges_rlc_2_4[1:], cdf_rlc_2_4, label="RLC 4 2", color="purple", linestyle=(0, (1, 1)), linewidth=3)
 
     ax.grid()
@@ -877,11 +885,17 @@ def analyze_latency_4_only():
 
     plt.ylabel("ECDF")
     plt.xlabel("Mean message time [ms]")
+    if is_100: s = "100"
+    else: s = "1000"
+    plt.title(f"{s} bytes payload")
     plt.tight_layout()
     # plt.gca().xaxis.set_major_formatter(PercentFormatter(1))
 
     # plt.legend(loc="best")
+    if is_100: s = "100_"
+    else: s = "1000_"
     leg = plt.legend(loc="best", handlelength=3)
+    plt.savefig(f"figures/mqtt_v2_{s}_temp.png")
     # plt.savefig("poster/mqtt_latency.pgf", transparent=True)
     # plt.savefig("figures/emqtt_latency_cdf.pdf")
     plt.show()
@@ -890,7 +904,7 @@ def analyze_latency_4_only():
 if __name__ == "__main__":
     # analyze_latency()
     # analyze_latency_reproducible()
-    analyze_latency_4_only()
+    analyze_latency_4_only(True)
     # analyze_latency_reproducible_slides()
     # varying_latency()
     # analyze_point_plot_same_K(90)
