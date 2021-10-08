@@ -36,7 +36,7 @@ static void bump_memlock_rlimit(void)
     struct rlimit rlim_new = {
         .rlim_cur = RLIM_INFINITY,
         .rlim_max = RLIM_INFINITY,
-    };
+    }; 
 
     if (setrlimit(RLIMIT_MEMLOCK, &rlim_new)) {
         fprintf(stderr, "Failed to increase RLIMIT_MEMLOCK limit!\n");
